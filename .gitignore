@@ -8,16 +8,26 @@ node_modules/
 .expo/
 dist/
 web-build/
-ios/
-android/
+expo-env.d.ts
 
 # Native builds
+ios/
+android/
 *.orig.*
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
+.kotlin/
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
 
 # Local databases
 *.db
@@ -29,6 +39,11 @@ coverage/
 # Env
 .env
 .env.local
+.env*.local
+
+# typescript
+*.tsbuildinfo
 
 # macOS
 .DS_Store
+*.pem
