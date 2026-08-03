@@ -20,6 +20,10 @@
 - TypeScript `strict: true`. No `any` in committed code.
 - **No network calls anywhere in v1.**
 - Tests run under Vitest in the `node` environment. Render tests are out of scope for this plan.
+- **The git repository already exists.** `main` tracks `origin/main` at
+  `https://github.com/danielsalipot/date-tracker` (private). Do **not** run `git init` or
+  `git remote add`. Every task ends by committing *and* pushing; a task is not complete until
+  `git push` succeeds.
 
 ---
 
@@ -164,12 +168,14 @@ Expected: PASS — 1 test passed.
 Run: `npx expo start`
 Expected: Metro starts with no TypeScript errors. Press `i` or `a` to confirm "Date Tracker" renders, then stop with `Ctrl+C`.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 9: Commit and push**
+
+The repository and the `origin` remote already exist — do not re-initialise them.
 
 ```bash
-git init
 git add -A
 git commit -m "chore: scaffold expo app with strict typescript and vitest"
+git push
 ```
 
 ---
@@ -394,11 +400,12 @@ export function formatMoney(value: Money): string {
 Run: `npm test -- money`
 Expected: PASS — all 15 tests pass.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Commit and push**
 
 ```bash
 git add src/domain/money
 git commit -m "feat: add float-free money domain with minor-unit arithmetic"
+git push
 ```
 
 ---
@@ -719,11 +726,12 @@ describe('schema', () => {
 Run: `npm test -- schema`
 Expected: PASS — 2 tests pass.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 10: Commit and push**
 
 ```bash
 git add src/db src/test drizzle drizzle.config.ts babel.config.js metro.config.js package.json package-lock.json
 git commit -m "feat: add sqlite schema, migrations and dual-driver database access"
+git push
 ```
 
 ---
@@ -893,11 +901,12 @@ export function ensureLocalContext(db: AppDatabase, clock: Clock): LocalContext 
 Run: `npm test -- bootstrap`
 Expected: PASS — 3 tests pass.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Commit and push**
 
 ```bash
 git add src/domain/clock.ts src/domain/identity
 git commit -m "feat: add injectable clock and local identity bootstrap"
+git push
 ```
 
 ---
@@ -1253,11 +1262,12 @@ export function listFeedDates(db: AppDatabase, coupleId: string): FeedDate[] {
 Run: `npm test -- repository`
 Expected: PASS — 8 tests pass.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Commit and push**
 
 ```bash
 git add src/domain/stops src/domain/dates
 git commit -m "feat: add stop taxonomy and implicit-open-date capture repository"
+git push
 ```
 
 ---
@@ -1557,11 +1567,12 @@ export function computeBudgetStatus(
 Run: `npm test`
 Expected: PASS — all suites green.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 9: Commit and push**
 
 ```bash
 git add src/domain/budget
 git commit -m "feat: add monthly budget period math and live status calculation"
+git push
 ```
 
 ---
@@ -1727,11 +1738,12 @@ export function seedTwelveMonths(
 Run: `npm test -- seed`
 Expected: PASS — 3 tests pass.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Commit and push**
 
 ```bash
 git add src/fixtures
 git commit -m "feat: add deterministic twelve-month fixture seeder"
+git push
 ```
 
 ---
@@ -1914,11 +1926,12 @@ Expected: the list fills with ~48 dates, each showing a stop count and a peso to
 Run: `npm test`
 Expected: PASS — all suites green.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Commit and push**
 
 ```bash
 git add app src/ui
 git commit -m "feat: add feed screen wired to local database and budget status"
+git push
 ```
 
 ---
