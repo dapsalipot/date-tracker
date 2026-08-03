@@ -115,9 +115,12 @@ Edit `tsconfig.json` so `compilerOptions` contains:
     "noUncheckedIndexedAccess": true,
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+  "include": ["**/*.ts", "**/*.mts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
 }
 ```
+
+`**/*.mts` matters: the Vitest config is an `.mts` file, and without this pattern
+`tsc --noEmit` silently stops type-checking the module aliases that Task 3 depends on.
 
 - [ ] **Step 5: Install and configure Vitest**
 
@@ -125,7 +128,9 @@ Edit `tsconfig.json` so `compilerOptions` contains:
 npm install -D vitest @types/node
 ```
 
-Create `vitest.config.ts`:
+Create `vitest.config.mts`. The `.mts` extension lets the config use ESM without adding
+`"type": "module"` to `package.json`, which would break Expo's CommonJS `babel.config.js`
+and `metro.config.js`.
 
 ```ts
 import { defineConfig } from 'vitest/config';
@@ -138,9 +143,9 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
       // expo-crypto has no Node build; tests use the shim added in Task 3.
-      'expo-crypto': path.resolve(__dirname, './src/test/expo-crypto-shim.ts'),
+      'expo-crypto': path.resolve(import.meta.dirname, './src/test/expo-crypto-shim.ts'),
     },
   },
 });
