@@ -40,12 +40,17 @@
 
 - [ ] **Step 1: Scaffold Expo into the existing directory**
 
-The directory already contains `docs/` and `.superpowers/`, so scaffold to a sibling and copy in.
+The directory already contains `docs/`, `.superpowers/` **and a live git repository with an
+`origin` remote**, so scaffold to a sibling and copy in.
+
+**`--exclude .git` is mandatory.** Without it, rsync copies the scaffold's throwaway git
+repository over the real one, destroying the `origin` remote and switching HEAD to a stray
+`master` branch.
 
 ```bash
 cd /Users/danielsalipot/Herd
 npx create-expo-app@latest date-tracker-scaffold
-rsync -a --exclude node_modules date-tracker-scaffold/ date-tracker/
+rsync -a --exclude node_modules --exclude .git date-tracker-scaffold/ date-tracker/
 rm -rf date-tracker-scaffold
 cd date-tracker
 npm install
@@ -53,9 +58,13 @@ npm install
 
 - [ ] **Step 2: Clear the template example screens**
 
+Expo SDK 57's default template places the router root at `src/app`, not top-level `app/`. This
+project uses **top-level `app/`** (Task 8 edits `app/_layout.tsx` and `app/index.tsx`), so the
+template's `src/app` must be removed or you end up with two competing router roots.
+
 ```bash
 cd /Users/danielsalipot/Herd/date-tracker
-rm -rf app components constants hooks scripts app-example
+rm -rf src/app src/components src/constants src/hooks app components constants hooks scripts app-example
 mkdir -p app src/domain/__tests__
 ```
 
