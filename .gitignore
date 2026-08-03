@@ -1,0 +1,34 @@
+# Brainstorm session artifacts (mockups, server state)
+.superpowers/
+
+# Dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+ios/
+android/
+
+# Native builds
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Local databases
+*.db
+*.db-journal
+
+# Testing
+coverage/
+
+# Env
+.env
+.env.local
+
+# macOS
+.DS_Store
