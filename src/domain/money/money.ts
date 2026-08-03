@@ -54,7 +54,8 @@ export function sumMoney(items: readonly Money[], currencyCode: string): Money {
  */
 export function parseMajorToMinor(input: string, currencyCode: string): Money {
   const cleaned = input.trim().replace(/,/g, '');
-  if (!/^-?\d*(\.\d*)?$/.test(cleaned) || cleaned === '' || cleaned === '-') {
+  const hasDigit = /\d/.test(cleaned);
+  if (!/^-?\d*(\.\d*)?$/.test(cleaned) || !hasDigit) {
     throw new Error(`invalid money input: "${input}"`);
   }
 

@@ -37,12 +37,27 @@ describe('parseMajorToMinor', () => {
     expect(() => parseMajorToMinor('abc', 'PHP')).toThrow(/invalid/i);
   });
 
-  it('does not lose precision the way floats do', () => {
-    // 0.1 + 0.2 !== 0.3 in float arithmetic. In minor units it is exact.
+  it('sums exactly in minor units', () => {
     const a = parseMajorToMinor('0.10', 'PHP');
     const b = parseMajorToMinor('0.20', 'PHP');
     expect(addMoney(a, b).amountMinor).toBe(30);
     expect(formatMoney(addMoney(a, b))).toBe('₱0.30');
+  });
+
+  it('rejects trailing garbage that parseFloat would silently accept', () => {
+    // parseFloat('12abc') returns 12. A typo must never become a silent amount.
+    expect(Number.parseFloat('12abc')).toBe(12);
+    expect(() => parseMajorToMinor('12abc', 'PHP')).toThrow(/invalid/i);
+  });
+
+  it('rejects scientific notation that parseFloat would silently accept', () => {
+    // parseFloat('1e3') returns 1000 — a 1000x error from one stray character.
+    expect(Number.parseFloat('1e3')).toBe(1000);
+    expect(() => parseMajorToMinor('1e3', 'PHP')).toThrow(/invalid/i);
+  });
+
+  it('rejects a bare decimal point', () => {
+    expect(() => parseMajorToMinor('.', 'PHP')).toThrow(/invalid/i);
   });
 });
 
