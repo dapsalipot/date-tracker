@@ -256,12 +256,29 @@ describe('parseMajorToMinor', () => {
     expect(() => parseMajorToMinor('abc', 'PHP')).toThrow(/invalid/i);
   });
 
-  it('does not lose precision the way floats do', () => {
-    // 0.1 + 0.2 !== 0.3 in float arithmetic. In minor units it is exact.
+  it('sums exactly in minor units', () => {
     const a = parseMajorToMinor('0.10', 'PHP');
     const b = parseMajorToMinor('0.20', 'PHP');
     expect(addMoney(a, b).amountMinor).toBe(30);
     expect(formatMoney(addMoney(a, b))).toBe('₱0.30');
+  });
+
+  // The value of string-based parsing is REJECTION, not precision. A naive
+  // Math.round(parseFloat(x) * 100) also returns 30 above — Math.round masks
+  // the ~1e-13 error. What it cannot do is refuse malformed input.
+  it('rejects trailing garbage that parseFloat would silently accept', () => {
+    expect(Number.parseFloat('12abc')).toBe(12);
+    expect(() => parseMajorToMinor('12abc', 'PHP')).toThrow(/invalid/i);
+  });
+
+  it('rejects scientific notation that parseFloat would silently accept', () => {
+    // parseFloat('1e3') returns 1000 — a 1000x error from one stray character.
+    expect(Number.parseFloat('1e3')).toBe(1000);
+    expect(() => parseMajorToMinor('1e3', 'PHP')).toThrow(/invalid/i);
+  });
+
+  it('rejects a bare decimal point', () => {
+    expect(() => parseMajorToMinor('.', 'PHP')).toThrow(/invalid/i);
   });
 });
 
@@ -367,7 +384,9 @@ export function sumMoney(items: readonly Money[], currencyCode: string): Money {
  */
 export function parseMajorToMinor(input: string, currencyCode: string): Money {
   const cleaned = input.trim().replace(/,/g, '');
-  if (!/^-?\d*(\.\d*)?$/.test(cleaned) || cleaned === '' || cleaned === '-') {
+  // hasDigit rejects '', '-', '.', and '-.' uniformly while still accepting '.5'.
+  const hasDigit = /\d/.test(cleaned);
+  if (!/^-?\d*(\.\d*)?$/.test(cleaned) || !hasDigit) {
     throw new Error(`invalid money input: "${input}"`);
   }
 
@@ -412,7 +431,7 @@ export function formatMoney(value: Money): string {
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npm test -- money`
-Expected: PASS — all 15 tests pass.
+Expected: PASS — all 18 money tests pass.
 
 - [ ] **Step 5: Commit and push**
 
