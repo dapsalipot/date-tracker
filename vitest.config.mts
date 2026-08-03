@@ -8,9 +8,9 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
       // expo-crypto has no Node build; tests use the shim added in Task 3.
-      'expo-crypto': path.resolve(__dirname, './src/test/expo-crypto-shim.ts'),
+      'expo-crypto': path.resolve(import.meta.dirname, './src/test/expo-crypto-shim.ts'),
     },
   },
 });

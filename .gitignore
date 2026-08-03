@@ -1,6 +1,11 @@
 # Brainstorm session artifacts (mockups, server state)
 .superpowers/
 
+# Agent-instruction files injected by create-expo-app (kept locally, not tracked)
+AGENTS.md
+CLAUDE.md
+.claude/
+
 # Dependencies
 node_modules/
 
