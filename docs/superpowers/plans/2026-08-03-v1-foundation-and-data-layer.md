@@ -688,7 +688,18 @@ import type { AppDatabase } from './types';
 // enableChangeListener is required for drizzle's useLiveQuery to react to writes.
 const expoDb = openDatabaseSync('datetracker.db', { enableChangeListener: true });
 
-export const db = drizzle(expoDb, { schema }) as unknown as AppDatabase;
+const drizzleDb = drizzle(expoDb, { schema });
+
+/**
+ * Typed handle passed to repositories. The cast widens the concrete expo type
+ * to the driver-agnostic `AppDatabase` so the same repositories run under
+ * better-sqlite3 in Node tests.
+ */
+export const db = drizzleDb as unknown as AppDatabase;
+
+/** Concrete handle for drizzle's migrator, which requires the expo type. */
+export const migrationDb = drizzleDb;
+
 export { expoDb };
 ```
 
@@ -928,6 +939,9 @@ git push
   - `interface CaptureStopInput { coupleId, userId, kind, subkind?, amountMinor, currencyCode, label?, placeName? }`
   - `interface CaptureResult { stopId: string; dateId: string; createdDate: boolean }`
   - `captureStop(db: AppDatabase, clock: Clock, input: CaptureStopInput): CaptureResult`
+  - `feedDatesQuery(db: AppDatabase, coupleId: string)` — returns the **unexecuted** Drizzle
+    query builder, so `useLiveQuery` can subscribe to it in Task 8
+  - `toFeedDate(row: FeedDateRow): FeedDate`
   - `listFeedDates(db: AppDatabase, coupleId: string): FeedDate[]`
   - `interface FeedDate { id, title, occurredOn, status, stopCount, totalMinor, currencyCode }`
 
@@ -1228,8 +1242,23 @@ export function captureStop(
   return { stopId, dateId, createdDate };
 }
 
-export function listFeedDates(db: AppDatabase, coupleId: string): FeedDate[] {
-  const rows = db
+export interface FeedDateRow {
+  id: string;
+  title: string | null;
+  occurredOn: string;
+  status: string;
+  stopCount: number;
+  totalMinor: number;
+}
+
+/**
+ * Returns the query builder WITHOUT executing it. Drizzle's `useLiveQuery`
+ * subscribes to a query object, not to an array, so the builder and the
+ * executed result are exposed separately: screens use the builder for
+ * reactivity, tests use `listFeedDates` for a plain value.
+ */
+export function feedDatesQuery(db: AppDatabase, coupleId: string) {
+  return db
     .select({
       id: dates.id,
       title: dates.title,
@@ -1242,10 +1271,11 @@ export function listFeedDates(db: AppDatabase, coupleId: string): FeedDate[] {
     .leftJoin(stops, and(eq(stops.dateId, dates.id), isNull(stops.deletedAt)))
     .where(and(eq(dates.coupleId, coupleId), isNull(dates.deletedAt)))
     .groupBy(dates.id)
-    .orderBy(desc(dates.occurredOn))
-    .all();
+    .orderBy(desc(dates.occurredOn));
+}
 
-  return rows.map((row) => ({
+export function toFeedDate(row: FeedDateRow): FeedDate {
+  return {
     id: row.id,
     title: row.title,
     occurredOn: row.occurredOn,
@@ -1253,7 +1283,11 @@ export function listFeedDates(db: AppDatabase, coupleId: string): FeedDate[] {
     stopCount: Number(row.stopCount),
     totalMinor: Number(row.totalMinor),
     currencyCode: 'PHP',
-  }));
+  };
+}
+
+export function listFeedDates(db: AppDatabase, coupleId: string): FeedDate[] {
+  return feedDatesQuery(db, coupleId).all().map(toFeedDate);
 }
 ```
 
@@ -1788,11 +1822,11 @@ import { Stack } from 'expo-router';
 import { Text, View } from 'react-native';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import migrations from '../drizzle/migrations';
-import { db } from '@/db/client';
+import { migrationDb } from '@/db/client';
 import { theme } from '@/ui/theme';
 
 export default function RootLayout() {
-  const { success, error } = useMigrations(db as never, migrations);
+  const { success, error } = useMigrations(migrationDb, migrations);
 
   if (error) {
     // A failed migration must never brick the app — surface it plainly.
@@ -1821,12 +1855,13 @@ export default function RootLayout() {
 Replace `app/index.tsx`:
 
 ```tsx
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { FlatList, Pressable, SafeAreaView, Text, View } from 'react-native';
+import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { db } from '@/db/client';
 import { systemClock } from '@/domain/clock';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
-import { listFeedDates } from '@/domain/dates/repository';
+import { feedDatesQuery, toFeedDate } from '@/domain/dates/repository';
 import { computeBudgetStatus } from '@/domain/budget/status';
 import { formatMoney, money } from '@/domain/money/money';
 import { seedTwelveMonths } from '@/fixtures/seed';
@@ -1835,10 +1870,18 @@ import { theme } from '@/ui/theme';
 export default function Feed() {
   const ctx = useMemo(() => ensureLocalContext(db, systemClock('Asia/Manila')), []);
   const clock = useMemo(() => systemClock(ctx.timezone), [ctx.timezone]);
-  const [version, setVersion] = useState(0);
 
-  const dates = useMemo(() => listFeedDates(db, ctx.coupleId), [ctx.coupleId, version]);
-  const budget = useMemo(() => computeBudgetStatus(db, ctx.coupleId, clock), [ctx.coupleId, clock, version]);
+  // useLiveQuery re-runs whenever the underlying tables change, so no state
+  // library and no manual refresh are needed. SQLite is the store.
+  const { data } = useLiveQuery(feedDatesQuery(db, ctx.coupleId));
+  const dates = useMemo(() => data.map(toFeedDate), [data]);
+
+  // Budget spans two queries, so it cannot be a single live query. Recomputing
+  // it when `data` changes is sufficient: every stop write changes `data`.
+  const budget = useMemo(
+    () => computeBudgetStatus(db, ctx.coupleId, clock),
+    [ctx.coupleId, clock, data],
+  );
 
   const remaining =
     budget.remainingMinor === null
@@ -1860,10 +1903,7 @@ export default function Feed() {
         contentContainerStyle={{ paddingHorizontal: theme.space.md, paddingBottom: theme.space.lg }}
         ListEmptyComponent={
           <Pressable
-            onPress={() => {
-              seedTwelveMonths(db, ctx.coupleId, ctx.userId, clock.todayLocal());
-              setVersion((v) => v + 1);
-            }}
+            onPress={() => seedTwelveMonths(db, ctx.coupleId, ctx.userId, clock.todayLocal())}
             style={{
               padding: theme.space.lg,
               borderRadius: theme.radius.md,
