@@ -1,0 +1,76 @@
+import { describe, expect, it } from 'vitest';
+import { createTestDb } from '@/test/testDb';
+import { fixedClock } from '@/domain/clock';
+import { ensureLocalContext } from '@/domain/identity/bootstrap';
+import { captureStop } from '@/domain/dates/repository';
+import { computeBudgetStatus, setBudget } from './status';
+
+const AUG_30 = fixedClock(1_787_000_000_000, '2026-08-30');
+const SEP_1 = fixedClock(1_787_300_000_000, '2026-09-01');
+
+function setup() {
+  const db = createTestDb();
+  const ctx = ensureLocalContext(db, AUG_30);
+  return { db, ...ctx };
+}
+
+describe('computeBudgetStatus', () => {
+  it('reports null budget when none is set', () => {
+    const { db, coupleId } = setup();
+
+    const status = computeBudgetStatus(db, coupleId, AUG_30);
+
+    expect(status.budgetMinor).toBeNull();
+    expect(status.remainingMinor).toBeNull();
+    expect(status.isOverBudget).toBe(false);
+    expect(status.spentMinor).toBe(0);
+  });
+
+  it('subtracts this month\'s spend from the budget', () => {
+    const { db, coupleId, userId } = setup();
+    setBudget(db, coupleId, '2026-08', 800000, AUG_30);
+
+    captureStop(db, AUG_30, { coupleId, userId, kind: 'food', amountMinor: 234000, currencyCode: 'PHP' });
+
+    const status = computeBudgetStatus(db, coupleId, AUG_30);
+
+    expect(status.spentMinor).toBe(234000);
+    expect(status.remainingMinor).toBe(566000);
+    expect(status.isOverBudget).toBe(false);
+    expect(status.daysLeft).toBe(2);
+  });
+
+  it('goes negative when over budget rather than clamping', () => {
+    const { db, coupleId, userId } = setup();
+    setBudget(db, coupleId, '2026-08', 100000, AUG_30);
+
+    captureStop(db, AUG_30, { coupleId, userId, kind: 'food', amountMinor: 150000, currencyCode: 'PHP' });
+
+    const status = computeBudgetStatus(db, coupleId, AUG_30);
+
+    expect(status.remainingMinor).toBe(-50000);
+    expect(status.isOverBudget).toBe(true);
+  });
+
+  it('excludes spend from other months', () => {
+    const { db, coupleId, userId } = setup();
+    setBudget(db, coupleId, '2026-09', 800000, SEP_1);
+
+    captureStop(db, AUG_30, { coupleId, userId, kind: 'food', amountMinor: 234000, currencyCode: 'PHP' });
+    captureStop(db, SEP_1, { coupleId, userId, kind: 'food', amountMinor: 50000, currencyCode: 'PHP' });
+
+    const status = computeBudgetStatus(db, coupleId, SEP_1);
+
+    expect(status.periodMonth).toBe('2026-09');
+    expect(status.spentMinor).toBe(50000);
+  });
+
+  it('overwrites an existing budget for the same period', () => {
+    const { db, coupleId } = setup();
+
+    setBudget(db, coupleId, '2026-08', 800000, AUG_30);
+    setBudget(db, coupleId, '2026-08', 500000, AUG_30);
+
+    expect(computeBudgetStatus(db, coupleId, AUG_30).budgetMinor).toBe(500000);
+  });
+});
