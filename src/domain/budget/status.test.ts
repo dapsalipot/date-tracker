@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createTestDb } from '@/test/testDb';
+import { eq } from 'drizzle-orm';
 import { fixedClock } from '@/domain/clock';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop } from '@/domain/dates/repository';
+import { stops } from '@/db/schema';
 import { computeBudgetStatus, setBudget } from './status';
 
 const AUG_30 = fixedClock(1_787_000_000_000, '2026-08-30');
@@ -63,6 +65,26 @@ describe('computeBudgetStatus', () => {
 
     expect(status.periodMonth).toBe('2026-09');
     expect(status.spentMinor).toBe(50000);
+  });
+
+  it("attributes spend by the date's occurred_on, not the stop's own timestamp", () => {
+    const { db, coupleId, userId } = setup();
+    setBudget(db, coupleId, '2026-08', 800000, AUG_30);
+
+    const captured = captureStop(db, AUG_30, {
+      coupleId, userId, kind: 'food', amountMinor: 234000, currencyCode: 'PHP',
+    });
+
+    // Push the stop's own timestamp into a different month. A date running past
+    // midnight must still count entirely in its date's month, so this must not
+    // change the August total. If the query ever joined on stops.occurred_at
+    // instead, spentMinor would drop to 0 here.
+    db.update(stops)
+      .set({ occurredAt: Date.parse('2026-09-15T03:00:00Z') })
+      .where(eq(stops.id, captured.stopId))
+      .run();
+
+    expect(computeBudgetStatus(db, coupleId, AUG_30).spentMinor).toBe(234000);
   });
 
   it('overwrites an existing budget for the same period', () => {
