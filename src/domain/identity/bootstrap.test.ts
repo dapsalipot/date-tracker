@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createTestDb } from '@/test/testDb';
 import { coupleMembers, couples, users } from '@/db/schema';
-import { fixedClock } from '@/domain/clock';
+import { fixedClock, systemClock } from '@/domain/clock';
 import { ensureLocalContext } from './bootstrap';
 
 const clock = fixedClock(1_700_000_000_000, '2026-08-03');
@@ -35,5 +35,19 @@ describe('fixedClock', () => {
   it('returns the values it was given', () => {
     expect(clock.nowMs()).toBe(1_700_000_000_000);
     expect(clock.todayLocal()).toBe('2026-08-03');
+  });
+});
+
+describe('systemClock', () => {
+  it('formats today as ISO YYYY-MM-DD', () => {
+    expect(systemClock('Asia/Manila').todayLocal()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('uses the given timezone rather than the machine zone', () => {
+    // Pacific/Kiritimati is UTC+14 and Pacific/Niue is UTC-11 — 25 hours apart,
+    // so their local calendar dates always differ, whenever this test runs.
+    expect(systemClock('Pacific/Kiritimati').todayLocal()).not.toBe(
+      systemClock('Pacific/Niue').todayLocal(),
+    );
   });
 });

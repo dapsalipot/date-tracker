@@ -853,6 +853,20 @@ describe('fixedClock', () => {
     expect(clock.todayLocal()).toBe('2026-08-03');
   });
 });
+
+describe('systemClock', () => {
+  it('formats today as ISO YYYY-MM-DD', () => {
+    expect(systemClock('Asia/Manila').todayLocal()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('uses the given timezone rather than the machine zone', () => {
+    // Pacific/Kiritimati is UTC+14 and Pacific/Niue is UTC-11 — 25 hours apart,
+    // so their local calendar dates always differ, whenever this test runs.
+    expect(systemClock('Pacific/Kiritimati').todayLocal()).not.toBe(
+      systemClock('Pacific/Niue').todayLocal(),
+    );
+  });
+});
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -878,15 +892,26 @@ export interface Clock {
  * deterministically instead of only at 11:59pm.
  */
 export function systemClock(timezone: string): Clock {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+
   return {
     nowMs: () => Date.now(),
-    todayLocal: () =>
-      new Intl.DateTimeFormat('en-CA', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date()),
+    // formatToParts reads fields by name instead of relying on a locale's
+    // field order. `en-CA` happens to render YYYY-MM-DD in current ICU, but
+    // that is a locale convention rather than a guarantee — and React Native's
+    // Hermes engine has patchier Intl support than Node, so a locale-string
+    // approach can pass in tests and misformat on a real Android device.
+    todayLocal: () => {
+      const parts = formatter.formatToParts(new Date());
+      const field = (type: Intl.DateTimeFormatPartTypes) =>
+        parts.find((part) => part.type === type)?.value ?? '';
+      return `${field('year')}-${field('month')}-${field('day')}`;
+    },
   };
 }
 
