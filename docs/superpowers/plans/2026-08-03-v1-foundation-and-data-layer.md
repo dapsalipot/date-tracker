@@ -2062,15 +2062,29 @@ import { FlatList, Pressable, SafeAreaView, Text, View } from 'react-native';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { db } from '@/db/client';
 import { systemClock } from '@/domain/clock';
-import { ensureLocalContext } from '@/domain/identity/bootstrap';
+import { ensureLocalContext, type LocalContext } from '@/domain/identity/bootstrap';
 import { feedDatesQuery, toFeedDate } from '@/domain/dates/repository';
 import { computeBudgetStatus } from '@/domain/budget/status';
 import { formatMoney, money } from '@/domain/money/money';
 import { seedTwelveMonths } from '@/fixtures/seed';
 import { theme } from '@/ui/theme';
 
+const FALLBACK_TIMEZONE = 'Asia/Manila';
+
+// Module scope rather than a render-phase useMemo: ensureLocalContext WRITES to
+// the database. useMemo initializers may be re-invoked — StrictMode deliberately
+// double-invokes them to surface impurity, and the React Compiler (enabled in
+// app.json) assumes render is pure. Caching here makes "exactly once per
+// process" a property of this code instead of React's memo semantics.
+let cachedContext: LocalContext | null = null;
+
+function getLocalContext(): LocalContext {
+  cachedContext ??= ensureLocalContext(db, systemClock(FALLBACK_TIMEZONE));
+  return cachedContext;
+}
+
 export default function Feed() {
-  const ctx = useMemo(() => ensureLocalContext(db, systemClock('Asia/Manila')), []);
+  const ctx = getLocalContext();
   const clock = useMemo(() => systemClock(ctx.timezone), [ctx.timezone]);
 
   // useLiveQuery re-runs whenever the underlying tables change, so no state
