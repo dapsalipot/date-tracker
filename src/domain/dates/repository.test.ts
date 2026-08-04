@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { eq, isNull } from 'drizzle-orm';
 import { createTestDb } from '@/test/testDb';
 import { dates, stops } from '@/db/schema';
 import { fixedClock } from '@/domain/clock';
@@ -92,6 +92,49 @@ describe('captureStop', () => {
     expect(result.dateId).not.toBe(older.dateId);
   });
 
+  it('orders drafts by updated_at, not by insertion order or id', () => {
+    const { db, coupleId, userId } = setup();
+    const base = AUG_3.nowMs();
+
+    // The winner ('mmmm') is neither the first nor the last inserted, and has
+    // neither the lowest nor the highest id. Only ORDER BY updated_at DESC can
+    // select it — every other plausible ordering picks 'aaaa' or 'zzzz'.
+    for (const [id, updatedAt] of [
+      ['aaaa-draft', base + 1_000],
+      ['mmmm-draft', base + 9_000],
+      ['zzzz-draft', base + 2_000],
+    ] as const) {
+      db.insert(dates).values({
+        id, coupleId, occurredOn: '2026-08-03', status: 'draft',
+        createdBy: userId, updatedAt,
+      }).run();
+    }
+
+    const result = captureStop(db, AUG_3, {
+      coupleId, userId, kind: 'food', amountMinor: 1, currencyCode: 'PHP',
+    });
+
+    expect(result.dateId).toBe('mmmm-draft');
+  });
+
+  it('never reuses a sort_order after a stop is tombstoned', () => {
+    const { db, coupleId, userId } = setup();
+
+    const first = captureStop(db, AUG_3, { coupleId, userId, kind: 'food', amountMinor: 1, currencyCode: 'PHP' });
+    const second = captureStop(db, AUG_3, { coupleId, userId, kind: 'food', amountMinor: 2, currencyCode: 'PHP' });
+    captureStop(db, AUG_3, { coupleId, userId, kind: 'food', amountMinor: 3, currencyCode: 'PHP' });
+
+    db.update(stops).set({ deletedAt: 1 }).where(eq(stops.id, second.stopId)).run();
+
+    captureStop(db, AUG_3, { coupleId, userId, kind: 'food', amountMinor: 4, currencyCode: 'PHP' });
+
+    const live = db.select().from(stops).where(isNull(stops.deletedAt)).all();
+    const orders = live.map((s) => s.sortOrder).sort((a, b) => a - b);
+    expect(orders).toEqual([0, 2, 3]);
+    expect(new Set(orders).size).toBe(orders.length);
+    expect(first.stopId).not.toBe(second.stopId);
+  });
+
   it('ignores published dates when finding today\'s draft', () => {
     const { db, coupleId, userId } = setup();
 
@@ -123,6 +166,37 @@ describe('listFeedDates', () => {
     expect(feed[0]?.occurredOn).toBe('2026-08-04');
     expect(feed[1]?.stopCount).toBe(2);
     expect(feed[1]?.totalMinor).toBe(110000);
+  });
+
+  it('excludes tombstoned stops from counts and totals', () => {
+    const { db, coupleId, userId } = setup();
+
+    captureStop(db, AUG_3, { coupleId, userId, kind: 'food', amountMinor: 42000, currencyCode: 'PHP' });
+    const removed = captureStop(db, AUG_3, {
+      coupleId, userId, kind: 'transport', amountMinor: 68000, currencyCode: 'PHP',
+    });
+
+    db.update(stops).set({ deletedAt: 1 }).where(eq(stops.id, removed.stopId)).run();
+
+    const feed = listFeedDates(db, coupleId);
+    expect(feed[0]?.stopCount).toBe(1);
+    expect(feed[0]?.totalMinor).toBe(42000);
+  });
+
+  it('keeps a date visible when every one of its stops is tombstoned', () => {
+    const { db, coupleId, userId } = setup();
+
+    const only = captureStop(db, AUG_3, {
+      coupleId, userId, kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
+    });
+    db.update(stops).set({ deletedAt: 1 }).where(eq(stops.id, only.stopId)).run();
+
+    // Guards the leftJoin ON-clause: moving isNull(stops.deletedAt) into the
+    // WHERE clause would make this date vanish from the feed entirely.
+    const feed = listFeedDates(db, coupleId);
+    expect(feed).toHaveLength(1);
+    expect(feed[0]?.stopCount).toBe(0);
+    expect(feed[0]?.totalMinor).toBe(0);
   });
 
   it('excludes soft-deleted dates and stops', () => {

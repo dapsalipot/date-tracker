@@ -79,10 +79,15 @@ export function captureStop(
     db.update(dates).set({ updatedAt: now }).where(eq(dates.id, dateId)).run();
   }
 
-  const siblings = db
-    .select()
+  // MAX over ALL siblings, tombstoned included. Counting only live stops would
+  // reuse a number after a delete: with stops at 0, 1, 2, tombstoning the one
+  // at 1 leaves two live siblings, so the next capture would be assigned 2 and
+  // collide with the stop already there. The (date_id, sort_order) index is not
+  // unique, so nothing would catch it — the timeline just loses its order.
+  const ordering = db
+    .select({ maxOrder: sql<number | null>`max(${stops.sortOrder})` })
     .from(stops)
-    .where(and(eq(stops.dateId, dateId), isNull(stops.deletedAt)))
+    .where(eq(stops.dateId, dateId))
     .all();
 
   const stopId = newId();
@@ -90,7 +95,7 @@ export function captureStop(
     .values({
       id: stopId,
       dateId,
-      sortOrder: siblings.length,
+      sortOrder: (ordering[0]?.maxOrder ?? -1) + 1,
       kind: input.kind,
       subkind: input.subkind ?? null,
       label: input.label ?? null,
