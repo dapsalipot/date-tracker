@@ -82,6 +82,9 @@ users
   id                text pk
   display_name      text not null
   avatar_uri        text
+  updated_at        integer not null
+  server_updated_at integer
+  deleted_at        integer
 
 couples
   id                text pk
@@ -90,11 +93,17 @@ couples
   currency_code     text not null default 'PHP'
   timezone          text not null           -- IANA, e.g. 'Asia/Manila'
   created_at        integer not null
+  updated_at        integer not null
+  server_updated_at integer
+  deleted_at        integer
 
 couple_members
   couple_id         text not null
   user_id           text not null
   joined_at         integer not null
+  updated_at        integer not null
+  server_updated_at integer
+  deleted_at        integer
   primary key (couple_id, user_id)
 
 dates
@@ -193,7 +202,11 @@ full initial push rather than replaying local history.
 - **`timezone` on `couples`** because month boundaries — and therefore the entire budget
   feature — are meaningless without one.
 - **Deletes are tombstones.** Hard deletes cause a row deleted on one device to resurrect from
-  the other on next sync.
+  the other on next sync. This applies to `couple_members` specifically: the unpair policy in
+  §10 diverges two copies of a timeline, and a hard-deleted membership would resurrect from the
+  ex-partner's device.
+- **`outbox` is the single exception** to the `updated_at`/`deleted_at` rule. It is an
+  append-only local queue, never updated and never synced — it is drained and hard-deleted.
 
 ### Month attribution rule
 
