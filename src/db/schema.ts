@@ -4,6 +4,9 @@ export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
   displayName: text('display_name').notNull(),
   avatarUri: text('avatar_uri'),
+  updatedAt: integer('updated_at').notNull(),
+  serverUpdatedAt: integer('server_updated_at'),
+  deletedAt: integer('deleted_at'),
 });
 
 export const couples = sqliteTable('couples', {
@@ -13,6 +16,9 @@ export const couples = sqliteTable('couples', {
   currencyCode: text('currency_code').notNull().default('PHP'),
   timezone: text('timezone').notNull().default('Asia/Manila'),
   createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+  serverUpdatedAt: integer('server_updated_at'),
+  deletedAt: integer('deleted_at'),
 });
 
 export const coupleMembers = sqliteTable(
@@ -21,6 +27,11 @@ export const coupleMembers = sqliteTable(
     coupleId: text('couple_id').notNull(),
     userId: text('user_id').notNull(),
     joinedAt: integer('joined_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    serverUpdatedAt: integer('server_updated_at'),
+    // Tombstone, not a hard delete: the unpair policy diverges two copies of a
+    // timeline, and a hard-deleted membership would resurrect from the ex-partner.
+    deletedAt: integer('deleted_at'),
   },
   (t) => ({ pk: primaryKey({ columns: [t.coupleId, t.userId] }) }),
 );

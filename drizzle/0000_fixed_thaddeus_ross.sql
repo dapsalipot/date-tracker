@@ -13,6 +13,9 @@ CREATE TABLE `couple_members` (
 	`couple_id` text NOT NULL,
 	`user_id` text NOT NULL,
 	`joined_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	`server_updated_at` integer,
+	`deleted_at` integer,
 	PRIMARY KEY(`couple_id`, `user_id`)
 );
 --> statement-breakpoint
@@ -22,7 +25,10 @@ CREATE TABLE `couples` (
 	`anniversary_on` text,
 	`currency_code` text DEFAULT 'PHP' NOT NULL,
 	`timezone` text DEFAULT 'Asia/Manila' NOT NULL,
-	`created_at` integer NOT NULL
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	`server_updated_at` integer,
+	`deleted_at` integer
 );
 --> statement-breakpoint
 CREATE TABLE `dates` (
@@ -95,5 +101,8 @@ CREATE INDEX `stops_kind_idx` ON `stops` (`kind`);--> statement-breakpoint
 CREATE TABLE `users` (
 	`id` text PRIMARY KEY NOT NULL,
 	`display_name` text NOT NULL,
-	`avatar_uri` text
+	`avatar_uri` text,
+	`updated_at` integer NOT NULL,
+	`server_updated_at` integer,
+	`deleted_at` integer
 );
