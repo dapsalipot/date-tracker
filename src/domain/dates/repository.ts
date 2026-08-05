@@ -44,70 +44,77 @@ export function captureStop(
   const now = deps.clock.nowMs();
   const today = deps.clock.todayLocal();
 
-  const openDrafts = db
-    .select()
-    .from(dates)
-    .where(
-      and(
-        eq(dates.coupleId, input.coupleId),
-        eq(dates.occurredOn, today),
-        eq(dates.status, 'draft'),
-        isNull(dates.deletedAt),
-      ),
-    )
-    .orderBy(desc(dates.updatedAt))
-    .all();
+  let result: CaptureResult | null = null;
 
-  const existing = openDrafts[0];
-  const dateId = existing?.id ?? deps.newId();
-  const createdDate = existing === undefined;
+  db.transaction((tx) => {
+    const openDrafts = tx
+      .select()
+      .from(dates)
+      .where(
+        and(
+          eq(dates.coupleId, input.coupleId),
+          eq(dates.occurredOn, today),
+          eq(dates.status, 'draft'),
+          isNull(dates.deletedAt),
+        ),
+      )
+      .orderBy(desc(dates.updatedAt))
+      .all();
 
-  if (createdDate) {
-    db.insert(dates)
+    const existing = openDrafts[0];
+    const dateId = existing?.id ?? deps.newId();
+    const createdDate = existing === undefined;
+
+    if (createdDate) {
+      tx.insert(dates)
+        .values({
+          id: dateId,
+          coupleId: input.coupleId,
+          occurredOn: today,
+          status: 'draft',
+          createdBy: input.userId,
+          startedAt: now,
+          updatedAt: now,
+        })
+        .run();
+    } else {
+      tx.update(dates).set({ updatedAt: now }).where(eq(dates.id, dateId)).run();
+    }
+
+    // MAX over ALL siblings, tombstoned included. Counting only live stops would
+    // reuse a number after a delete: with stops at 0, 1, 2, tombstoning the one
+    // at 1 leaves two live siblings, so the next capture would be assigned 2 and
+    // collide with the stop already there. The (date_id, sort_order) index is not
+    // unique, so nothing would catch it — the timeline just loses its order.
+    const ordering = tx
+      .select({ maxOrder: sql<number | null>`max(${stops.sortOrder})` })
+      .from(stops)
+      .where(eq(stops.dateId, dateId))
+      .all();
+
+    const stopId = deps.newId();
+    tx.insert(stops)
       .values({
-        id: dateId,
-        coupleId: input.coupleId,
-        occurredOn: today,
-        status: 'draft',
-        createdBy: input.userId,
-        startedAt: now,
+        id: stopId,
+        dateId,
+        sortOrder: (ordering[0]?.maxOrder ?? -1) + 1,
+        kind: input.kind,
+        subkind: input.subkind ?? null,
+        label: input.label ?? null,
+        placeName: input.placeName ?? null,
+        occurredAt: now,
+        amountMinor: input.amountMinor,
+        currencyCode: input.currencyCode,
+        paidByUserId: input.userId,
         updatedAt: now,
       })
       .run();
-  } else {
-    db.update(dates).set({ updatedAt: now }).where(eq(dates.id, dateId)).run();
-  }
 
-  // MAX over ALL siblings, tombstoned included. Counting only live stops would
-  // reuse a number after a delete: with stops at 0, 1, 2, tombstoning the one
-  // at 1 leaves two live siblings, so the next capture would be assigned 2 and
-  // collide with the stop already there. The (date_id, sort_order) index is not
-  // unique, so nothing would catch it — the timeline just loses its order.
-  const ordering = db
-    .select({ maxOrder: sql<number | null>`max(${stops.sortOrder})` })
-    .from(stops)
-    .where(eq(stops.dateId, dateId))
-    .all();
+    result = { stopId, dateId, createdDate };
+  });
 
-  const stopId = deps.newId();
-  db.insert(stops)
-    .values({
-      id: stopId,
-      dateId,
-      sortOrder: (ordering[0]?.maxOrder ?? -1) + 1,
-      kind: input.kind,
-      subkind: input.subkind ?? null,
-      label: input.label ?? null,
-      placeName: input.placeName ?? null,
-      occurredAt: now,
-      amountMinor: input.amountMinor,
-      currencyCode: input.currencyCode,
-      paidByUserId: input.userId,
-      updatedAt: now,
-    })
-    .run();
-
-  return { stopId, dateId, createdDate };
+  if (!result) throw new Error('captureStop produced no result');
+  return result;
 }
 
 export interface FeedDateRow {

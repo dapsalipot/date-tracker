@@ -149,6 +149,26 @@ describe('captureStop', () => {
     expect(result.createdDate).toBe(true);
     expect(result.dateId).not.toBe('published');
   });
+
+  it('leaves no ghost draft when the stop insert fails', () => {
+    const { db, coupleId, userId } = setup();
+    let calls = 0;
+    const exploding = {
+      ...AUG_3,
+      newId: () => {
+        calls += 1;
+        if (calls === 2) throw new Error('boom');
+        return `x-${calls}`;
+      },
+    };
+
+    expect(() =>
+      captureStop(db, exploding, { coupleId, userId, kind: 'food', amountMinor: 1, currencyCode: 'PHP' }),
+    ).toThrow(/boom/);
+
+    expect(db.select().from(dates).all()).toHaveLength(0);
+    expect(db.select().from(stops).all()).toHaveLength(0);
+  });
 });
 
 describe('listFeedDates', () => {

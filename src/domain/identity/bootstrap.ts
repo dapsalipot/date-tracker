@@ -33,19 +33,25 @@ export function ensureLocalContext(db: AppDatabase, deps: Deps): LocalContext {
 
   const now = deps.clock.nowMs();
   const userId = deps.newId();
-  const coupleId = deps.newId();
 
-  db.insert(users).values({ id: userId, displayName: 'Me', updatedAt: now }).run();
-  db.insert(couples)
-    .values({
-      id: coupleId,
-      currencyCode: DEFAULT_CURRENCY,
-      timezone: DEFAULT_TIMEZONE,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
-  db.insert(coupleMembers).values({ coupleId, userId, joinedAt: now, updatedAt: now }).run();
+  let created: LocalContext | null = null;
 
-  return { userId, coupleId, currencyCode: DEFAULT_CURRENCY, timezone: DEFAULT_TIMEZONE };
+  db.transaction((tx) => {
+    tx.insert(users).values({ id: userId, displayName: 'Me', updatedAt: now }).run();
+    const coupleId = deps.newId();
+    tx.insert(couples)
+      .values({
+        id: coupleId,
+        currencyCode: DEFAULT_CURRENCY,
+        timezone: DEFAULT_TIMEZONE,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    tx.insert(coupleMembers).values({ coupleId, userId, joinedAt: now, updatedAt: now }).run();
+    created = { userId, coupleId, currencyCode: DEFAULT_CURRENCY, timezone: DEFAULT_TIMEZONE };
+  });
+
+  if (!created) throw new Error('identity bootstrap produced no context');
+  return created;
 }

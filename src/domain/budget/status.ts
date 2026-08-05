@@ -21,23 +21,26 @@ export function setBudget(
   deps: Deps,
 ): void {
   const now = deps.clock.nowMs();
-  const existing = db
-    .select()
-    .from(budgets)
-    .where(and(eq(budgets.coupleId, coupleId), eq(budgets.periodMonth, periodMonth)))
-    .all();
 
-  if (existing.length > 0) {
-    db.update(budgets)
-      .set({ amountMinor, updatedAt: now, deletedAt: null })
+  db.transaction((tx) => {
+    const existing = tx
+      .select()
+      .from(budgets)
       .where(and(eq(budgets.coupleId, coupleId), eq(budgets.periodMonth, periodMonth)))
-      .run();
-    return;
-  }
+      .all();
 
-  db.insert(budgets)
-    .values({ id: deps.newId(), coupleId, periodMonth, amountMinor, updatedAt: now })
-    .run();
+    if (existing.length > 0) {
+      tx.update(budgets)
+        .set({ amountMinor, updatedAt: now, deletedAt: null })
+        .where(and(eq(budgets.coupleId, coupleId), eq(budgets.periodMonth, periodMonth)))
+        .run();
+      return;
+    }
+
+    tx.insert(budgets)
+      .values({ id: deps.newId(), coupleId, periodMonth, amountMinor, updatedAt: now })
+      .run();
+  });
 }
 
 /**

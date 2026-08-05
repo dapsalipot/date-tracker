@@ -30,6 +30,28 @@ describe('ensureLocalContext', () => {
     expect(second.coupleId).toBe(first.coupleId);
     expect(db.select().from(couples).all()).toHaveLength(1);
   });
+
+  it('creates no partial identity when a write fails midway', () => {
+    const db = createTestDb();
+    const deps = testDeps(1_700_000_000_000, '2026-08-03');
+    let calls = 0;
+    const exploding = {
+      ...deps,
+      newId: () => {
+        calls += 1;
+        if (calls === 2) throw new Error('boom');
+        return `id-${calls}`;
+      },
+    };
+
+    expect(() => ensureLocalContext(db, exploding)).toThrow(/boom/);
+
+    // Without a transaction the users row survives and the couple never
+    // arrives, so the next launch mints a second identity and orphans this one.
+    expect(db.select().from(users).all()).toHaveLength(0);
+    expect(db.select().from(couples).all()).toHaveLength(0);
+    expect(db.select().from(coupleMembers).all()).toHaveLength(0);
+  });
 });
 
 describe('fixedClock', () => {
