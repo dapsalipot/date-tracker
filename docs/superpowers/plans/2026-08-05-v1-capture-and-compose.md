@@ -368,8 +368,12 @@ In `src/domain/identity/bootstrap.ts`, replace the three bare inserts with a tra
   const userId = deps.newId();
 
   db.transaction((tx) => {
-    const coupleId = deps.newId();
+    // The users insert runs BEFORE the second newId() call, deliberately. The
+    // test injects a generator that throws on its second call; if the id were
+    // generated first, the throw would land before any write and the test would
+    // pass vacuously — proving nothing about rollback.
     tx.insert(users).values({ id: userId, displayName: 'Me', updatedAt: now }).run();
+    const coupleId = deps.newId();
     tx.insert(couples)
       .values({
         id: coupleId,
