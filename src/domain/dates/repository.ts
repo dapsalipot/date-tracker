@@ -2,6 +2,7 @@ import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { dates, stops } from '@/db/schema';
 import type { AppDatabase } from '@/db/types';
 import type { Deps } from '@/domain/deps';
+import { attachPhoto } from '@/domain/photos/repository';
 import type { CoupleScope } from '@/domain/scope';
 import type { StopKind } from '@/domain/stops/taxonomy';
 
@@ -14,6 +15,22 @@ export interface CaptureStopInput {
   currencyCode: string;
   label?: string | null;
   placeName?: string | null;
+  /**
+   * Attached in the same transaction as the stop. The capture sheet copies the
+   * picked image to durable storage *before* calling this, so by the time we
+   * are here the file already exists and only the database row is at risk —
+   * and it now cannot land half-written. Two separate transactions meant a
+   * failure between them left a committed stop the user could not see had
+   * saved, so the natural retry wrote a duplicate charge.
+   */
+  photo?: CapturePhoto | null;
+}
+
+export interface CapturePhoto {
+  localUri: string;
+  width: number;
+  height: number;
+  takenAt?: number | null;
 }
 
 export interface CaptureResult {
@@ -110,6 +127,23 @@ export function captureStop(
         updatedAt: now,
       })
       .run();
+
+    // attachPhoto takes an AppDatabase, and a drizzle transaction satisfies
+    // that type, so the photo row joins this transaction rather than opening
+    // its own. No duplicated insert, no second commit point.
+    // attachPhoto takes an AppDatabase, and a drizzle transaction satisfies
+    // that type, so the photo row joins this transaction rather than opening
+    // its own. No duplicated insert, no second commit point.
+    if (input.photo) {
+      attachPhoto(tx, deps, {
+        dateId,
+        stopId,
+        localUri: input.photo.localUri,
+        width: input.photo.width,
+        height: input.photo.height,
+        takenAt: input.photo.takenAt ?? null,
+      });
+    }
 
     result = { stopId, dateId, createdDate };
   });

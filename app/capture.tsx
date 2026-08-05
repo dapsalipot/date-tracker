@@ -4,7 +4,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { db } from '@/db/client';
 import { captureStop } from '@/domain/dates/repository';
-import { attachPhoto } from '@/domain/photos/repository';
 import { computeBudgetStatus } from '@/domain/budget/status';
 import { kindsByRecentUse } from '@/domain/stops/recent';
 import { formatMoney, money, parseMajorToMinor } from '@/domain/money/money';
@@ -69,23 +68,25 @@ export default function Capture() {
         durablePhotoUri = persistPickedImage(pendingPhoto.uri, photoFileName);
       }
 
-      const result = captureStop(db, deps, {
+      // One call, one transaction. Passing the photo to captureStop rather than
+      // attaching it afterwards removes the last window where a failure could
+      // commit the stop and still report an error — which is what made a retry
+      // write a duplicate charge.
+      captureStop(db, deps, {
         coupleId: ctx.coupleId,
         userId: ctx.userId,
         kind,
         amountMinor,
         currencyCode: ctx.currencyCode,
+        photo:
+          pendingPhoto && durablePhotoUri
+            ? {
+                localUri: durablePhotoUri,
+                width: pendingPhoto.width,
+                height: pendingPhoto.height,
+              }
+            : null,
       });
-
-      if (pendingPhoto && durablePhotoUri) {
-        attachPhoto(db, deps, {
-          dateId: result.dateId,
-          stopId: result.stopId,
-          localUri: durablePhotoUri,
-          width: pendingPhoto.width,
-          height: pendingPhoto.height,
-        });
-      }
 
       router.back();
     } catch {

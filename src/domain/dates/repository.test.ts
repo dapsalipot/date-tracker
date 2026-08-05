@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { eq, isNull } from 'drizzle-orm';
 import { createTestDb, testDeps } from '@/test/testDb';
-import { dates, stops } from '@/db/schema';
+import { dates, photos, stops } from '@/db/schema';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop, listFeedDates } from './repository';
 import type { AppDatabase } from '@/db/types';
@@ -168,6 +168,49 @@ describe('captureStop', () => {
 
     expect(db.select().from(dates).all()).toHaveLength(0);
     expect(db.select().from(stops).all()).toHaveLength(0);
+  });
+
+  it('attaches a photo in the same transaction as the stop', () => {
+    const { db, coupleId, userId } = setup();
+
+    const result = captureStop(db, AUG_3, {
+      coupleId, userId, kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
+      photo: { localUri: 'file:///durable/a.jpg', width: 1600, height: 1200 },
+    });
+
+    const saved = db.select().from(photos).all();
+    expect(saved).toHaveLength(1);
+    expect(saved[0]?.localUri).toBe('file:///durable/a.jpg');
+    expect(saved[0]?.stopId).toBe(result.stopId);
+    expect(saved[0]?.dateId).toBe(result.dateId);
+  });
+
+  it('leaves no stop behind when the photo insert fails', () => {
+    const { db, coupleId, userId } = setup();
+    // Ids are minted in order: date, stop, photo. Exploding on the third means
+    // the stop is already inserted when the failure lands — exactly the window
+    // that let a retry write a duplicate charge when these were two separate
+    // transactions.
+    let calls = 0;
+    const exploding = {
+      ...AUG_3,
+      newId: () => {
+        calls += 1;
+        if (calls === 3) throw new Error('boom');
+        return `x-${calls}`;
+      },
+    };
+
+    expect(() =>
+      captureStop(db, exploding, {
+        coupleId, userId, kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
+        photo: { localUri: 'file:///durable/a.jpg', width: 1, height: 1 },
+      }),
+    ).toThrow(/boom/);
+
+    expect(db.select().from(stops).all()).toHaveLength(0);
+    expect(db.select().from(dates).all()).toHaveLength(0);
+    expect(db.select().from(photos).all()).toHaveLength(0);
   });
 });
 
