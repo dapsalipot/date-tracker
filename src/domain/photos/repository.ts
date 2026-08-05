@@ -1,5 +1,5 @@
 import { and, asc, eq, isNull } from 'drizzle-orm';
-import { photos } from '@/db/schema';
+import { dates, photos } from '@/db/schema';
 import type { AppDatabase } from '@/db/types';
 import type { Deps } from '@/domain/deps';
 
@@ -70,8 +70,19 @@ export function listPhotosForDate(db: AppDatabase, dateId: string): PhotoRow[] {
 
 export function detachPhoto(db: AppDatabase, deps: Deps, photoId: string): void {
   const now = deps.clock.nowMs();
-  db.update(photos)
-    .set({ deletedAt: now, updatedAt: now })
-    .where(eq(photos.id, photoId))
-    .run();
+
+  db.transaction((tx) => {
+    tx.update(photos)
+      .set({ deletedAt: now, updatedAt: now })
+      .where(eq(photos.id, photoId))
+      .run();
+
+    // Tombstones do not cascade, so a date could otherwise keep pointing at a
+    // photo the user just deleted. Scoped by cover_photo_id, this is a no-op
+    // for the common case of detaching a photo that was never the cover.
+    tx.update(dates)
+      .set({ coverPhotoId: null, updatedAt: now })
+      .where(eq(dates.coverPhotoId, photoId))
+      .run();
+  });
 }

@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { photos } from '@/db/schema';
+import { dates, photos } from '@/db/schema';
 import { createTestDb, testDeps } from '@/test/testDb';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop } from '@/domain/dates/repository';
@@ -70,5 +70,19 @@ describe('detachPhoto', () => {
       .all();
     expect(raw).toHaveLength(1);
     expect(raw[0]?.deletedAt).toBe(1_785_000_000_000);
+  });
+
+  it('clears the cover it was serving when detached', () => {
+    const { db, dateId } = setup();
+    const id = attachPhoto(db, DEPS, { dateId, localUri: 'file:///a.jpg', width: 1, height: 1 });
+    db.update(dates).set({ coverPhotoId: id }).where(eq(dates.id, dateId)).run();
+
+    detachPhoto(db, DEPS, id);
+
+    // A dangling cover_photo_id would render an empty card with no way for the
+    // user to understand why, and there is no foreign-key cascade for a tombstone.
+    const cover = db.select({ coverPhotoId: dates.coverPhotoId }).from(dates)
+      .where(eq(dates.id, dateId)).all()[0]?.coverPhotoId;
+    expect(cover).toBeNull();
   });
 });
