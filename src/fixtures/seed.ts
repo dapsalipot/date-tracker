@@ -1,3 +1,5 @@
+import { eq } from 'drizzle-orm';
+import { dates } from '@/db/schema';
 import { fixedClock } from '@/domain/clock';
 import { captureStop } from '@/domain/dates/repository';
 import { setBudget } from '@/domain/budget/status';
@@ -13,6 +15,12 @@ interface Template {
   placeName: string;
   baseMinor: number;
 }
+
+const TITLES: readonly string[] = [
+  'Bag of Beans Day', 'Rainy Tagaytay', 'Movie night', 'Milk tea run',
+  'Anniversary dinner', 'Beach day', 'Mall wandering', 'Videoke night',
+  'Sunday brunch', 'Road trip north', 'Museum afternoon', 'Late-night drive',
+];
 
 const TEMPLATES: readonly Template[] = [
   { kind: 'food', subkind: 'cafe', label: 'Morning coffee', placeName: 'Bo\'s Coffee', baseMinor: 42000 },
@@ -71,12 +79,19 @@ export function seedTwelveMonths(
     const dayDeps: Deps = { clock: fixedClock(Date.parse(`${day}T12:00:00Z`), day), newId: deps.newId };
 
     const stopCount = 2 + Math.floor(seededUnit(i + 100) * 3);
+    let dateId: string | undefined;
     for (let s = 0; s < stopCount; s += 1) {
       const template = TEMPLATES[(i + s * 3) % TEMPLATES.length];
       if (!template) continue;
 
       const jitter = 0.8 + seededUnit(i * 10 + s) * 0.4;
-      captureStop(db, dayDeps, {
+      // Spread stops across the evening rather than stamping every one at noon,
+      // so a seeded date's timeline is actually visible on the detail screen.
+      const stopDeps: Deps = {
+        clock: fixedClock(Date.parse(`${day}T${String(10 + s * 3).padStart(2, '0')}:00:00Z`), day),
+        newId: deps.newId,
+      };
+      const result = captureStop(db, stopDeps, {
         coupleId,
         userId,
         kind: template.kind,
@@ -86,6 +101,18 @@ export function seedTwelveMonths(
         amountMinor: Math.round((template.baseMinor * jitter) / 100) * 100,
         currencyCode: 'PHP',
       });
+      dateId ??= result.dateId;
+    }
+
+    if (dateId) {
+      // Vary status and title: a demo where all 48 cards read "Untitled date /
+      // DRAFT" tells you nothing about how the real feed looks. Two recent drafts
+      // are kept so the draft strip has something to nudge.
+      const title = TITLES[i % TITLES.length] ?? 'A date';
+      db.update(dates)
+        .set({ title, status: i < 2 ? 'draft' : 'published', rating: 3 + (i % 3), updatedAt: dayDeps.clock.nowMs() })
+        .where(eq(dates.id, dateId))
+        .run();
     }
   }
 

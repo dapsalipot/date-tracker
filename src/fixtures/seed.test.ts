@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { createTestDb, testDeps } from '@/test/testDb';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { listFeedDates } from '@/domain/dates/repository';
+import { listDraftDates } from '@/domain/dates/drafts';
 import { computeBudgetStatus } from '@/domain/budget/status';
+import { listStopsForDate } from '@/domain/stops/edit';
 import { budgets } from '@/db/schema';
 import { seedTwelveMonths } from './seed';
 
@@ -58,5 +60,29 @@ describe('seedTwelveMonths', () => {
     };
 
     expect(runOnce()).toEqual(runOnce());
+  });
+
+  it('produces varied titles and published dates, not 48 identical drafts', () => {
+    const db = createTestDb();
+    const ctx = ensureLocalContext(db, AUG_3);
+
+    seedTwelveMonths(db, ctx.coupleId, ctx.userId, '2026-08-03', AUG_3);
+
+    const scope = { coupleId: ctx.coupleId, currencyCode: ctx.currencyCode };
+    const all = listFeedDates(db, scope);
+    expect(new Set(all.map((d) => d.title)).size).toBeGreaterThan(5);
+    expect(all.filter((d) => d.status === 'published').length).toBeGreaterThan(40);
+    expect(listDraftDates(db, scope)).toHaveLength(2);
+  });
+
+  it('spreads stop times so each date has a visible timeline', () => {
+    const db = createTestDb();
+    const ctx = ensureLocalContext(db, AUG_3);
+
+    seedTwelveMonths(db, ctx.coupleId, ctx.userId, '2026-08-03', AUG_3);
+
+    const first = listFeedDates(db, { coupleId: ctx.coupleId, currencyCode: ctx.currencyCode })[0];
+    const times = listStopsForDate(db, first?.id ?? '').map((s) => s.occurredAt);
+    expect(new Set(times).size).toBe(times.length);
   });
 });
