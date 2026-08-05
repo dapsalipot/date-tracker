@@ -4,6 +4,7 @@ import { createTestDb, testDeps } from '@/test/testDb';
 import { dates, photos, stops } from '@/db/schema';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop, listFeedDates } from './repository';
+import { attachPhoto } from '@/domain/photos/repository';
 import type { AppDatabase } from '@/db/types';
 
 const AUG_3 = testDeps(1_785_000_000_000, '2026-08-03', 'aug3');
@@ -306,5 +307,44 @@ describe('listFeedDates', () => {
     expect(aug4?.stopCount).toBe(0);
     expect(aug4?.totalMinor).toBe(0);
     expect(aug4?.currencyCode).toBe('PHP');
+  });
+
+  it('carries the cover photo uri onto the feed card', () => {
+    const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+
+    const captured = captureStop(db, AUG_3, {
+      coupleId, userId, kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
+    });
+    const photoId = attachPhoto(db, AUG_3, {
+      dateId: captured.dateId, localUri: 'file:///cover.jpg', width: 4, height: 3,
+    });
+    db.update(dates).set({ coverPhotoId: photoId }).where(eq(dates.id, captured.dateId)).run();
+
+    const feed = listFeedDates(db, scope);
+
+    expect(feed).toHaveLength(1);
+    expect(feed[0]?.coverUri).toBe('file:///cover.jpg');
+  });
+
+  it('reports no cover when the cover photo has been tombstoned', () => {
+    const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+
+    const captured = captureStop(db, AUG_3, {
+      coupleId, userId, kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
+    });
+    const photoId = attachPhoto(db, AUG_3, {
+      dateId: captured.dateId, localUri: 'file:///cover.jpg', width: 4, height: 3,
+    });
+    db.update(dates).set({ coverPhotoId: photoId }).where(eq(dates.id, captured.dateId)).run();
+    db.update(photos).set({ deletedAt: 1_785_000_000_000 }).where(eq(photos.id, photoId)).run();
+
+    const feed = listFeedDates(db, scope);
+
+    // The date must still appear, just without a cover — a tombstoned photo
+    // must not turn the leftJoin into a filter on the whole row.
+    expect(feed).toHaveLength(1);
+    expect(feed[0]?.coverUri).toBeNull();
   });
 });

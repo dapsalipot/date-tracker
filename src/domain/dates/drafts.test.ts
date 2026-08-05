@@ -112,9 +112,14 @@ describe('publishedDatesQuery cover photo', () => {
       coupleId: ctx.coupleId, userId: ctx.userId,
       kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
     });
+    // A second, non-cover photo on the same date. Dates accumulate photos as
+    // captures happen, so a date with one cover photo set almost always has
+    // others lying around too. If the join matched on dateId instead of the
+    // photo's own id, this second photo would multiply the stop rows.
     captureStop(db, AUG_3, {
       coupleId: ctx.coupleId, userId: ctx.userId,
       kind: 'transport', amountMinor: 8000, currencyCode: 'PHP',
+      photo: { localUri: 'file:///candid.jpg', width: 4, height: 3 },
     });
     const photoId = attachPhoto(db, AUG_3, {
       dateId: captured.dateId, localUri: 'file:///cover.jpg', width: 4, height: 3,
