@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createTestDb } from '@/test/testDb';
+import { createTestDb, testDeps } from '@/test/testDb';
 import { eq } from 'drizzle-orm';
-import { fixedClock } from '@/domain/clock';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop } from '@/domain/dates/repository';
 import { stops } from '@/db/schema';
 import { computeBudgetStatus, setBudget } from './status';
 
-const AUG_30 = fixedClock(1_787_000_000_000, '2026-08-30');
-const SEP_1 = fixedClock(1_787_300_000_000, '2026-09-01');
+const AUG_30 = testDeps(1_787_000_000_000, '2026-08-30', 'aug30');
+const SEP_1 = testDeps(1_787_300_000_000, '2026-09-01', 'sep1');
 
 function setup() {
   const db = createTestDb();

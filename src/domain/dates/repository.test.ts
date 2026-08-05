@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { eq, isNull } from 'drizzle-orm';
-import { createTestDb } from '@/test/testDb';
+import { createTestDb, testDeps } from '@/test/testDb';
 import { dates, stops } from '@/db/schema';
-import { fixedClock } from '@/domain/clock';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop, listFeedDates } from './repository';
 import type { AppDatabase } from '@/db/types';
 
-const AUG_3 = fixedClock(1_785_000_000_000, '2026-08-03');
-const AUG_4 = fixedClock(1_785_090_000_000, '2026-08-04');
+const AUG_3 = testDeps(1_785_000_000_000, '2026-08-03', 'aug3');
+const AUG_4 = testDeps(1_785_090_000_000, '2026-08-04', 'aug4');
 
 function setup(): { db: AppDatabase; coupleId: string; userId: string } {
   const db = createTestDb();
@@ -81,7 +80,7 @@ describe('captureStop', () => {
     });
     db.insert(dates).values({
       id: 'second-draft', coupleId, occurredOn: '2026-08-03', status: 'draft',
-      createdBy: userId, updatedAt: AUG_3.nowMs() + 5_000,
+      createdBy: userId, updatedAt: AUG_3.clock.nowMs() + 5_000,
     }).run();
 
     const result = captureStop(db, AUG_3, {
@@ -94,7 +93,7 @@ describe('captureStop', () => {
 
   it('orders drafts by updated_at, not by insertion order or id', () => {
     const { db, coupleId, userId } = setup();
-    const base = AUG_3.nowMs();
+    const base = AUG_3.clock.nowMs();
 
     // The winner ('mmmm') is neither the first nor the last inserted, and has
     // neither the lowest nor the highest id. Only ORDER BY updated_at DESC can
@@ -140,7 +139,7 @@ describe('captureStop', () => {
 
     db.insert(dates).values({
       id: 'published', coupleId, occurredOn: '2026-08-03', status: 'published',
-      createdBy: userId, updatedAt: AUG_3.nowMs(),
+      createdBy: userId, updatedAt: AUG_3.clock.nowMs(),
     }).run();
 
     const result = captureStop(db, AUG_3, {

@@ -1,20 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { createTestDb } from '@/test/testDb';
-import { fixedClock } from '@/domain/clock';
+import { createTestDb, testDeps } from '@/test/testDb';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { listFeedDates } from '@/domain/dates/repository';
 import { computeBudgetStatus } from '@/domain/budget/status';
 import { budgets } from '@/db/schema';
 import { seedTwelveMonths } from './seed';
 
-const AUG_3 = fixedClock(1_785_000_000_000, '2026-08-03');
+const AUG_3 = testDeps(1_785_000_000_000, '2026-08-03');
 
 describe('seedTwelveMonths', () => {
   it('creates a year of dates with stops and budgets', () => {
     const db = createTestDb();
     const ctx = ensureLocalContext(db, AUG_3);
 
-    seedTwelveMonths(db, ctx.coupleId, ctx.userId, '2026-08-03');
+    seedTwelveMonths(db, ctx.coupleId, ctx.userId, '2026-08-03', AUG_3);
 
     const feed = listFeedDates(db, ctx.coupleId);
     // Exactly 48: offsets step 7 days with at most 2 days of jitter, so every
@@ -29,7 +28,7 @@ describe('seedTwelveMonths', () => {
     const db = createTestDb();
     const ctx = ensureLocalContext(db, AUG_3);
 
-    seedTwelveMonths(db, ctx.coupleId, ctx.userId, '2026-08-03');
+    seedTwelveMonths(db, ctx.coupleId, ctx.userId, '2026-08-03', AUG_3);
 
     const spentMonths = new Set(listFeedDates(db, ctx.coupleId).map((d) => d.occurredOn.slice(0, 7)));
     const budgetedMonths = new Set(
@@ -45,7 +44,7 @@ describe('seedTwelveMonths', () => {
     const db = createTestDb();
     const ctx = ensureLocalContext(db, AUG_3);
 
-    seedTwelveMonths(db, ctx.coupleId, ctx.userId, '2026-08-03');
+    seedTwelveMonths(db, ctx.coupleId, ctx.userId, '2026-08-03', AUG_3);
 
     expect(computeBudgetStatus(db, ctx.coupleId, AUG_3).budgetMinor).toBe(800000);
   });
@@ -54,7 +53,7 @@ describe('seedTwelveMonths', () => {
     const runOnce = () => {
       const db = createTestDb();
       const ctx = ensureLocalContext(db, AUG_3);
-      seedTwelveMonths(db, ctx.coupleId, ctx.userId, '2026-08-03');
+      seedTwelveMonths(db, ctx.coupleId, ctx.userId, '2026-08-03', AUG_3);
       return listFeedDates(db, ctx.coupleId).map((d) => d.totalMinor);
     };
 

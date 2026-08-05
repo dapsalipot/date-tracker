@@ -1,7 +1,6 @@
 import { coupleMembers, couples, users } from '@/db/schema';
-import { newId } from '@/db/id';
 import type { AppDatabase } from '@/db/types';
-import type { Clock } from '@/domain/clock';
+import type { Deps } from '@/domain/deps';
 
 export interface LocalContext {
   userId: string;
@@ -18,7 +17,7 @@ const DEFAULT_TIMEZONE = 'Asia/Manila';
  * one membership joining them. Every write is couple-scoped exactly as it will
  * be in v2 — the only difference is that the membership has one row, not two.
  */
-export function ensureLocalContext(db: AppDatabase, clock: Clock): LocalContext {
+export function ensureLocalContext(db: AppDatabase, deps: Deps): LocalContext {
   const existing = db.select().from(coupleMembers).limit(1).all();
   const first = existing[0];
 
@@ -32,9 +31,9 @@ export function ensureLocalContext(db: AppDatabase, clock: Clock): LocalContext 
     };
   }
 
-  const now = clock.nowMs();
-  const userId = newId();
-  const coupleId = newId();
+  const now = deps.clock.nowMs();
+  const userId = deps.newId();
+  const coupleId = deps.newId();
 
   db.insert(users).values({ id: userId, displayName: 'Me', updatedAt: now }).run();
   db.insert(couples)

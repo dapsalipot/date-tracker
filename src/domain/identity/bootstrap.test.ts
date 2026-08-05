@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { createTestDb } from '@/test/testDb';
+import { createTestDb, testDeps } from '@/test/testDb';
 import { coupleMembers, couples, users } from '@/db/schema';
 import { fixedClock, systemClock } from '@/domain/clock';
 import { ensureLocalContext } from './bootstrap';
 
 const clock = fixedClock(1_700_000_000_000, '2026-08-03');
+const deps = testDeps(1_700_000_000_000, '2026-08-03');
 
 describe('ensureLocalContext', () => {
   it('creates a user, couple and membership on first run', () => {
     const db = createTestDb();
 
-    const ctx = ensureLocalContext(db, clock);
+    const ctx = ensureLocalContext(db, deps);
 
     expect(db.select().from(users).all()).toHaveLength(1);
     expect(db.select().from(couples).all()).toHaveLength(1);
@@ -22,8 +23,8 @@ describe('ensureLocalContext', () => {
   it('is idempotent across launches', () => {
     const db = createTestDb();
 
-    const first = ensureLocalContext(db, clock);
-    const second = ensureLocalContext(db, clock);
+    const first = ensureLocalContext(db, deps);
+    const second = ensureLocalContext(db, deps);
 
     expect(second.userId).toBe(first.userId);
     expect(second.coupleId).toBe(first.coupleId);

@@ -19,3 +19,14 @@ export const db = drizzleDb as unknown as AppDatabase;
 export const migrationDb = drizzleDb;
 
 export { expoDb };
+
+import { randomUUID } from 'expo-crypto';
+import type { Deps, IdGenerator } from '@/domain/deps';
+import { systemClock } from '@/domain/clock';
+
+/** The app's real id source. `src/db/` may import expo-*; `src/domain/` may not. */
+export const newId: IdGenerator = () => randomUUID();
+
+export function appDeps(timezone: string): Deps {
+  return { clock: systemClock(timezone), newId };
+}

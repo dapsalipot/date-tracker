@@ -1,8 +1,7 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { dates, stops } from '@/db/schema';
-import { newId } from '@/db/id';
 import type { AppDatabase } from '@/db/types';
-import type { Clock } from '@/domain/clock';
+import type { Deps } from '@/domain/deps';
 import type { StopKind } from '@/domain/stops/taxonomy';
 
 export interface CaptureStopInput {
@@ -39,11 +38,11 @@ export interface FeedDate {
  */
 export function captureStop(
   db: AppDatabase,
-  clock: Clock,
+  deps: Deps,
   input: CaptureStopInput,
 ): CaptureResult {
-  const now = clock.nowMs();
-  const today = clock.todayLocal();
+  const now = deps.clock.nowMs();
+  const today = deps.clock.todayLocal();
 
   const openDrafts = db
     .select()
@@ -60,7 +59,7 @@ export function captureStop(
     .all();
 
   const existing = openDrafts[0];
-  const dateId = existing?.id ?? newId();
+  const dateId = existing?.id ?? deps.newId();
   const createdDate = existing === undefined;
 
   if (createdDate) {
@@ -90,7 +89,7 @@ export function captureStop(
     .where(eq(stops.dateId, dateId))
     .all();
 
-  const stopId = newId();
+  const stopId = deps.newId();
   db.insert(stops)
     .values({
       id: stopId,

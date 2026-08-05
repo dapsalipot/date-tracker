@@ -1,8 +1,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { budgets, dates, stops } from '@/db/schema';
-import { newId } from '@/db/id';
 import type { AppDatabase } from '@/db/types';
-import type { Clock } from '@/domain/clock';
+import type { Deps } from '@/domain/deps';
 import { daysRemainingIn, periodMonthFor } from './period';
 
 export interface BudgetStatus {
@@ -19,9 +18,9 @@ export function setBudget(
   coupleId: string,
   periodMonth: string,
   amountMinor: number,
-  clock: Clock,
+  deps: Deps,
 ): void {
-  const now = clock.nowMs();
+  const now = deps.clock.nowMs();
   const existing = db
     .select()
     .from(budgets)
@@ -37,7 +36,7 @@ export function setBudget(
   }
 
   db.insert(budgets)
-    .values({ id: newId(), coupleId, periodMonth, amountMinor, updatedAt: now })
+    .values({ id: deps.newId(), coupleId, periodMonth, amountMinor, updatedAt: now })
     .run();
 }
 
@@ -49,9 +48,9 @@ export function setBudget(
 export function computeBudgetStatus(
   db: AppDatabase,
   coupleId: string,
-  clock: Clock,
+  deps: Deps,
 ): BudgetStatus {
-  const today = clock.todayLocal();
+  const today = deps.clock.todayLocal();
   const periodMonth = periodMonthFor(today);
 
   const spentRows = db

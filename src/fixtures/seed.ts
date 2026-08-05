@@ -3,6 +3,7 @@ import { captureStop } from '@/domain/dates/repository';
 import { setBudget } from '@/domain/budget/status';
 import { periodMonthFor } from '@/domain/budget/period';
 import type { AppDatabase } from '@/db/types';
+import type { Deps } from '@/domain/deps';
 import type { StopKind } from '@/domain/stops/taxonomy';
 
 interface Template {
@@ -56,6 +57,7 @@ export function seedTwelveMonths(
   coupleId: string,
   userId: string,
   endDate: string,
+  deps: Deps,
 ): void {
   const dateCount = 48;
   const months = new Set<string>();
@@ -66,7 +68,7 @@ export function seedTwelveMonths(
     // offsets can miss a month: jitter only moves dates earlier, so the oldest
     // sample can land in a month no budget was ever created for.
     months.add(periodMonthFor(day));
-    const clock = fixedClock(Date.parse(`${day}T12:00:00Z`), day);
+    const dayDeps: Deps = { clock: fixedClock(Date.parse(`${day}T12:00:00Z`), day), newId: deps.newId };
 
     const stopCount = 2 + Math.floor(seededUnit(i + 100) * 3);
     for (let s = 0; s < stopCount; s += 1) {
@@ -74,7 +76,7 @@ export function seedTwelveMonths(
       if (!template) continue;
 
       const jitter = 0.8 + seededUnit(i * 10 + s) * 0.4;
-      captureStop(db, clock, {
+      captureStop(db, dayDeps, {
         coupleId,
         userId,
         kind: template.kind,
@@ -87,8 +89,11 @@ export function seedTwelveMonths(
     }
   }
 
-  const seedClock = fixedClock(Date.parse(`${endDate}T12:00:00Z`), endDate);
+  const seedDeps: Deps = {
+    clock: fixedClock(Date.parse(`${endDate}T12:00:00Z`), endDate),
+    newId: deps.newId,
+  };
   for (const month of months) {
-    setBudget(db, coupleId, month, 800000, seedClock);
+    setBudget(db, coupleId, month, 800000, seedDeps);
   }
 }

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createTestDb } from '@/test/testDb';
 import { couples, coupleMembers, users } from './schema';
-import { newId } from './id';
+import { sequentialIds } from '@/domain/deps';
+
+const newId = sequentialIds('schema');
 
 describe('schema', () => {
   it('applies migrations and round-trips a couple', () => {

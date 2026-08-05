@@ -1,8 +1,7 @@
 import { useMemo } from 'react';
 import { FlatList, Pressable, SafeAreaView, Text, View } from 'react-native';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import { db } from '@/db/client';
-import { systemClock } from '@/domain/clock';
+import { db, appDeps } from '@/db/client';
 import { ensureLocalContext, type LocalContext } from '@/domain/identity/bootstrap';
 import { feedDatesQuery, toFeedDate } from '@/domain/dates/repository';
 import { computeBudgetStatus } from '@/domain/budget/status';
@@ -20,13 +19,13 @@ const FALLBACK_TIMEZONE = 'Asia/Manila';
 let cachedContext: LocalContext | null = null;
 
 function getLocalContext(): LocalContext {
-  cachedContext ??= ensureLocalContext(db, systemClock(FALLBACK_TIMEZONE));
+  cachedContext ??= ensureLocalContext(db, appDeps(FALLBACK_TIMEZONE));
   return cachedContext;
 }
 
 export default function Feed() {
   const ctx = getLocalContext();
-  const clock = useMemo(() => systemClock(ctx.timezone), [ctx.timezone]);
+  const deps = useMemo(() => appDeps(ctx.timezone), [ctx.timezone]);
 
   // useLiveQuery re-runs whenever the underlying tables change, so no state
   // library and no manual refresh are needed. SQLite is the store.
@@ -36,8 +35,8 @@ export default function Feed() {
   // Budget spans two queries, so it cannot be a single live query. Recomputing
   // it when `data` changes is sufficient: every stop write changes `data`.
   const budget = useMemo(
-    () => computeBudgetStatus(db, ctx.coupleId, clock),
-    [ctx.coupleId, clock, data],
+    () => computeBudgetStatus(db, ctx.coupleId, deps),
+    [ctx.coupleId, deps, data],
   );
 
   const remaining =
@@ -60,7 +59,7 @@ export default function Feed() {
         contentContainerStyle={{ paddingHorizontal: theme.space.md, paddingBottom: theme.space.lg }}
         ListEmptyComponent={
           <Pressable
-            onPress={() => seedTwelveMonths(db, ctx.coupleId, ctx.userId, clock.todayLocal())}
+            onPress={() => seedTwelveMonths(db, ctx.coupleId, ctx.userId, deps.clock.todayLocal(), deps)}
             style={{
               padding: theme.space.lg,
               borderRadius: theme.radius.md,
