@@ -27,6 +27,13 @@
     "plugins": [
       "expo-router",
       [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Let $(PRODUCT_NAME) use the camera so you can add a photo to a date.",
+          "photosPermission": "Let $(PRODUCT_NAME) access your photos so you can add them to a date."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
