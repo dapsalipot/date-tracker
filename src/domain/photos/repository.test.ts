@@ -1,4 +1,6 @@
+import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
+import { photos } from '@/db/schema';
 import { createTestDb, testDeps } from '@/test/testDb';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop } from '@/domain/dates/repository';
@@ -57,5 +59,16 @@ describe('detachPhoto', () => {
     detachPhoto(db, DEPS, id);
 
     expect(listPhotosForDate(db, dateId)).toHaveLength(0);
+
+    // The row must still be there. Asserting only that it left the filtered
+    // list is satisfied just as well by a hard delete, which would destroy
+    // the row v2's sync needs in order to propagate the deletion.
+    const raw = db
+      .select({ id: photos.id, deletedAt: photos.deletedAt })
+      .from(photos)
+      .where(eq(photos.id, id))
+      .all();
+    expect(raw).toHaveLength(1);
+    expect(raw[0]?.deletedAt).toBe(1_785_000_000_000);
   });
 });

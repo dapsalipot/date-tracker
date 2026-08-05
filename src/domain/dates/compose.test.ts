@@ -1,4 +1,6 @@
+import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
+import { dates } from '@/db/schema';
 import { createTestDb, testDeps } from '@/test/testDb';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop } from '@/domain/dates/repository';
@@ -29,13 +31,17 @@ describe('updateDateDetails', () => {
 
   it('bumps updated_at so sync and draft ordering see the edit', () => {
     const { db, dateId } = setup();
-    const before = loadDateDetail(db, dateId);
+    const updatedAtOf = () =>
+      db.select({ updatedAt: dates.updatedAt }).from(dates)
+        .where(eq(dates.id, dateId)).all()[0]?.updatedAt;
+    const before = updatedAtOf();
 
-    const later = testDeps(1_785_999_999_999, '2026-08-03');
+    const later = testDeps(1_785_999_999_999, '2026-08-03', 'later');
     updateDateDetails(db, later, dateId, { caption: 'worth the rain' });
 
     expect(loadDateDetail(db, dateId)?.caption).toBe('worth the rain');
-    expect(before?.status).toBe('draft');
+    expect(updatedAtOf()).toBe(1_785_999_999_999);
+    expect(updatedAtOf()).not.toBe(before);
   });
 });
 
