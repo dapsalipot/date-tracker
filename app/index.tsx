@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
 import { FlatList, Pressable, SafeAreaView, Text, View } from 'react-native';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+import { router } from 'expo-router';
 import { db, appDeps } from '@/db/client';
 import { ensureLocalContext, type LocalContext } from '@/domain/identity/bootstrap';
-import { feedDatesQuery, toFeedDate } from '@/domain/dates/repository';
+import { toFeedDate } from '@/domain/dates/repository';
+import { draftDatesQuery, publishedDatesQuery } from '@/domain/dates/drafts';
 import { computeBudgetStatus } from '@/domain/budget/status';
 import { formatMoney, money } from '@/domain/money/money';
 import { seedTwelveMonths } from '@/fixtures/seed';
@@ -28,13 +30,20 @@ export default function Feed() {
   const deps = useMemo(() => appDeps(ctx.timezone), [ctx.timezone]);
 
   // useLiveQuery re-runs whenever the underlying tables change, so no state
-  // library and no manual refresh are needed. SQLite is the store.
-  const { data } = useLiveQuery(feedDatesQuery(db, ctx));
-  const dates = useMemo(() => data.map((row) => toFeedDate(row, ctx.currencyCode)), [data, ctx.currencyCode]);
+  // library and no manual refresh are needed. SQLite is the store. Two live
+  // queries rather than one filtered in JS: drafts and published dates render
+  // as different UI (a slim strip vs. cards) and sort in opposite directions.
+  const { data: draftRows } = useLiveQuery(draftDatesQuery(db, ctx));
+  const { data: publishedRows } = useLiveQuery(publishedDatesQuery(db, ctx));
+  const drafts = useMemo(() => draftRows.map((r) => toFeedDate(r, ctx.currencyCode)), [draftRows, ctx.currencyCode]);
+  const published = useMemo(
+    () => publishedRows.map((r) => toFeedDate(r, ctx.currencyCode)),
+    [publishedRows, ctx.currencyCode],
+  );
 
   // Budget spans two queries, so it cannot be a single live query. Recomputing
-  // it when `data` changes is sufficient: every stop write changes `data`.
-  const budget = useMemo(() => computeBudgetStatus(db, ctx, deps), [ctx, deps, data]);
+  // it when either list changes is sufficient: every stop write changes one.
+  const budget = useMemo(() => computeBudgetStatus(db, ctx, deps), [ctx, deps, draftRows, publishedRows]);
 
   const remaining =
     budget.remainingMinor === null
@@ -50,46 +59,69 @@ export default function Feed() {
         </Text>
       </View>
 
+      {drafts.length > 0 && (
+        <Pressable
+          onPress={() => router.push(`/date/${drafts[0]?.id}/compose`)}
+          style={{ marginHorizontal: theme.space.md, marginBottom: theme.space.sm, padding: theme.space.md, borderRadius: theme.radius.md, backgroundColor: theme.color.blush, flexDirection: 'row', justifyContent: 'space-between' }}
+        >
+          <Text style={{ fontWeight: '700', color: theme.color.ink }}>
+            {drafts.length === 1 ? '1 date waiting' : `${drafts.length} dates waiting`}
+          </Text>
+          <Text style={{ color: theme.color.rose, fontWeight: '700' }}>Finish →</Text>
+        </Pressable>
+      )}
+
       <FlatList
-        data={dates}
+        data={published}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: theme.space.md, paddingBottom: theme.space.lg }}
         ListEmptyComponent={
-          <Pressable
-            onPress={() => seedTwelveMonths(db, ctx.coupleId, ctx.userId, deps.clock.todayLocal(), deps)}
-            style={{
-              padding: theme.space.lg,
-              borderRadius: theme.radius.md,
-              backgroundColor: theme.color.blush,
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ color: theme.color.ink, fontWeight: '700' }}>Seed 12 months of demo dates</Text>
-          </Pressable>
+          drafts.length === 0 && published.length === 0 ? (
+            <Pressable
+              onPress={() => seedTwelveMonths(db, ctx.coupleId, ctx.userId, deps.clock.todayLocal(), deps)}
+              style={{
+                padding: theme.space.lg,
+                borderRadius: theme.radius.md,
+                backgroundColor: theme.color.blush,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: theme.color.ink, fontWeight: '700' }}>Seed 12 months of demo dates</Text>
+            </Pressable>
+          ) : null
         }
         renderItem={({ item }) => (
-          <View
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: theme.radius.md,
-              borderWidth: 1,
-              borderColor: theme.color.line,
-              padding: theme.space.md,
-              marginBottom: theme.space.sm,
-            }}
-          >
-            <Text style={{ fontSize: 11, letterSpacing: 1, color: theme.color.muted }}>
-              {item.occurredOn.toUpperCase()} · {item.status.toUpperCase()}
-            </Text>
-            <Text style={{ fontSize: 17, fontWeight: '700', color: theme.color.ink, marginTop: 2 }}>
-              {item.title ?? 'Untitled date'}
-            </Text>
-            <Text style={{ color: theme.color.muted, marginTop: 4 }}>
-              {item.stopCount} stops · {formatMoney(money(item.totalMinor, item.currencyCode))}
-            </Text>
-          </View>
+          <Pressable onPress={() => router.push(`/date/${item.id}`)}>
+            <View
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: theme.radius.md,
+                borderWidth: 1,
+                borderColor: theme.color.line,
+                padding: theme.space.md,
+                marginBottom: theme.space.sm,
+              }}
+            >
+              <Text style={{ fontSize: 11, letterSpacing: 1, color: theme.color.muted }}>
+                {item.occurredOn.toUpperCase()} · {item.status.toUpperCase()}
+              </Text>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: theme.color.ink, marginTop: 2 }}>
+                {item.title ?? 'Untitled date'}
+              </Text>
+              <Text style={{ color: theme.color.muted, marginTop: 4 }}>
+                {item.stopCount} stops · {formatMoney(money(item.totalMinor, item.currencyCode))}
+              </Text>
+            </View>
+          </Pressable>
         )}
       />
+
+      <Pressable
+        onPress={() => router.push('/capture')}
+        style={{ position: 'absolute', right: theme.space.lg, bottom: theme.space.lg, width: 60, height: 60, borderRadius: 30, backgroundColor: theme.color.ink, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Text style={{ color: theme.color.cream, fontSize: 30, lineHeight: 34 }}>+</Text>
+      </Pressable>
     </SafeAreaView>
   );
 }
