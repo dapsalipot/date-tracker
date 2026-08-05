@@ -128,10 +128,11 @@ export interface FeedDateRow {
 }
 
 /**
- * Returns the query builder WITHOUT executing it. Drizzle's `useLiveQuery`
- * subscribes to a query object, not to an array, so the builder and the
- * executed result are exposed separately: screens use the builder for
- * reactivity, tests use `listFeedDates` for a plain value.
+ * Returns the query builder WITHOUT executing it. No screen subscribes to
+ * this one with `useLiveQuery` any more — `app/index.tsx` uses
+ * `draftDatesQuery`/`publishedDatesQuery` from `./drafts` instead. This stays
+ * as the honest "all dates for the couple" read: `listFeedDates`, built on
+ * it, is exercised directly by tests in this file and in `seed.test.ts`.
  */
 export function feedDatesQuery(db: AppDatabase, scope: CoupleScope) {
   return db
