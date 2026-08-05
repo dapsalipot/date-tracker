@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createTestDb, testDeps } from '@/test/testDb';
-import { dates } from '@/db/schema';
+import { dates, photos } from '@/db/schema';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop } from '@/domain/dates/repository';
-import { listDraftDates } from './drafts';
+import { attachPhoto } from '@/domain/photos/repository';
+import { listDraftDates, publishedDatesQuery } from './drafts';
 
 const AUG_3 = testDeps(1_785_000_000_000, '2026-08-03');
 const AUG_4 = testDeps(1_785_090_000_000, '2026-08-04');
@@ -47,5 +48,83 @@ describe('listDraftDates', () => {
     captureStop(db, AUG_4, base);
 
     expect(listDraftDates(db, scope)[0]?.id).toBe(older.dateId);
+  });
+});
+
+describe('publishedDatesQuery cover photo', () => {
+  it('carries the cover photo uri onto the feed card', () => {
+    const { db, ctx } = setup();
+    const captured = captureStop(db, AUG_3, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
+    });
+    const photoId = attachPhoto(db, AUG_3, {
+      dateId: captured.dateId, localUri: 'file:///cover.jpg', width: 4, height: 3,
+    });
+    db.update(dates).set({ coverPhotoId: photoId, title: 'Tagaytay', status: 'published' })
+      .where(eq(dates.id, captured.dateId)).run();
+
+    const feed = publishedDatesQuery(db, ctx).all();
+
+    expect(feed).toHaveLength(1);
+    expect(feed[0]?.coverUri).toBe('file:///cover.jpg');
+  });
+
+  it('reports no cover for a date that has none', () => {
+    const { db, ctx } = setup();
+    const captured = captureStop(db, AUG_3, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
+    });
+    db.update(dates).set({ title: 'No cover', status: 'published' })
+      .where(eq(dates.id, captured.dateId)).run();
+
+    const feed = publishedDatesQuery(db, ctx).all();
+
+    // The date must still appear. A card with no photo is normal, not a
+    // filtered-out row.
+    expect(feed).toHaveLength(1);
+    expect(feed[0]?.coverUri).toBeNull();
+  });
+
+  it('reports no cover when the cover photo has been tombstoned', () => {
+    const { db, ctx } = setup();
+    const captured = captureStop(db, AUG_3, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
+    });
+    const photoId = attachPhoto(db, AUG_3, {
+      dateId: captured.dateId, localUri: 'file:///cover.jpg', width: 4, height: 3,
+    });
+    db.update(dates).set({ coverPhotoId: photoId, title: 'Tagaytay', status: 'published' })
+      .where(eq(dates.id, captured.dateId)).run();
+    db.update(photos).set({ deletedAt: 1_785_000_000_000 }).where(eq(photos.id, photoId)).run();
+
+    const feed = publishedDatesQuery(db, ctx).all();
+
+    expect(feed).toHaveLength(1);
+    expect(feed[0]?.coverUri).toBeNull();
+  });
+
+  it('does not let the cover join inflate the stop count or total', () => {
+    const { db, ctx } = setup();
+    const captured = captureStop(db, AUG_3, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
+    });
+    captureStop(db, AUG_3, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'transport', amountMinor: 8000, currencyCode: 'PHP',
+    });
+    const photoId = attachPhoto(db, AUG_3, {
+      dateId: captured.dateId, localUri: 'file:///cover.jpg', width: 4, height: 3,
+    });
+    db.update(dates).set({ coverPhotoId: photoId, title: 'Tagaytay', status: 'published' })
+      .where(eq(dates.id, captured.dateId)).run();
+
+    const feed = publishedDatesQuery(db, ctx).all();
+
+    expect(feed[0]?.stopCount).toBe(2);
+    expect(feed[0]?.totalMinor).toBe(50000);
   });
 });

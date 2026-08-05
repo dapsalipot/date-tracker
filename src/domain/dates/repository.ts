@@ -1,5 +1,5 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
-import { dates, stops } from '@/db/schema';
+import { dates, photos, stops } from '@/db/schema';
 import type { AppDatabase } from '@/db/types';
 import type { Deps } from '@/domain/deps';
 import { attachPhoto } from '@/domain/photos/repository';
@@ -47,6 +47,7 @@ export interface FeedDate {
   stopCount: number;
   totalMinor: number;
   currencyCode: string;
+  coverUri: string | null;
 }
 
 /**
@@ -159,6 +160,7 @@ export interface FeedDateRow {
   status: string;
   stopCount: number;
   totalMinor: number;
+  coverUri: string | null;
 }
 
 /**
@@ -175,6 +177,7 @@ export function feedDatesQuery(db: AppDatabase, scope: CoupleScope) {
       title: dates.title,
       occurredOn: dates.occurredOn,
       status: dates.status,
+      coverUri: photos.localUri,
       stopCount: sql<number>`count(${stops.id})`,
       totalMinor: sql<number>`coalesce(sum(${stops.amountMinor}), 0)`,
     })
@@ -189,6 +192,11 @@ export function feedDatesQuery(db: AppDatabase, scope: CoupleScope) {
         eq(stops.currencyCode, scope.currencyCode),
       ),
     )
+    // Matches at most one row (photos.id is the primary key), so it cannot
+    // multiply the stop rows the count and sum are computed over. The
+    // deletedAt check belongs in the ON clause: in the WHERE it would turn
+    // this into an inner join and drop every date that has no cover.
+    .leftJoin(photos, and(eq(photos.id, dates.coverPhotoId), isNull(photos.deletedAt)))
     .where(and(eq(dates.coupleId, scope.coupleId), isNull(dates.deletedAt)))
     .groupBy(dates.id)
     .orderBy(desc(dates.occurredOn));
@@ -203,6 +211,7 @@ export function toFeedDate(row: FeedDateRow, currencyCode: string): FeedDate {
     stopCount: Number(row.stopCount),
     totalMinor: Number(row.totalMinor),
     currencyCode,
+    coverUri: row.coverUri,
   };
 }
 
