@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { db, appDeps } from '@/db/client';
+import { db } from '@/db/client';
 import { loadDateDetail, publishDate, updateDateDetails } from '@/domain/dates/compose';
+import { getAppDeps } from '@/session';
 import { theme } from '@/ui/theme';
 
 export default function Compose() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const deps = useMemo(() => appDeps('Asia/Manila'), []);
+  const deps = getAppDeps();
   const detail = useMemo(() => loadDateDetail(db, id), [id]);
 
   const [title, setTitle] = useState(detail?.title ?? '');

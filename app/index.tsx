@@ -2,32 +2,18 @@ import { useMemo } from 'react';
 import { FlatList, Pressable, SafeAreaView, Text, View } from 'react-native';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { router } from 'expo-router';
-import { db, appDeps } from '@/db/client';
-import { ensureLocalContext, type LocalContext } from '@/domain/identity/bootstrap';
+import { db } from '@/db/client';
 import { toFeedDate } from '@/domain/dates/repository';
 import { draftDatesQuery, publishedDatesQuery } from '@/domain/dates/drafts';
 import { computeBudgetStatus } from '@/domain/budget/status';
 import { formatMoney, money } from '@/domain/money/money';
 import { seedTwelveMonths } from '@/fixtures/seed';
+import { getAppDeps, getLocalContext } from '@/session';
 import { theme } from '@/ui/theme';
-
-const FALLBACK_TIMEZONE = 'Asia/Manila';
-
-// Module scope rather than a render-phase useMemo: ensureLocalContext WRITES to
-// the database. useMemo initializers may be re-invoked — StrictMode deliberately
-// double-invokes them to surface impurity, and the React Compiler (enabled in
-// app.json) assumes render is pure. Caching here makes "exactly once per
-// process" a property of this code instead of React's memo semantics.
-let cachedContext: LocalContext | null = null;
-
-function getLocalContext(): LocalContext {
-  cachedContext ??= ensureLocalContext(db, appDeps(FALLBACK_TIMEZONE));
-  return cachedContext;
-}
 
 export default function Feed() {
   const ctx = getLocalContext();
-  const deps = useMemo(() => appDeps(ctx.timezone), [ctx.timezone]);
+  const deps = getAppDeps();
 
   // useLiveQuery re-runs whenever the underlying tables change, so no state
   // library and no manual refresh are needed. SQLite is the store. Two live

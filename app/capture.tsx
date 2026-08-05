@@ -2,8 +2,7 @@ import { useMemo, useState } from 'react';
 import { Alert, Pressable, SafeAreaView, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { db, appDeps } from '@/db/client';
-import { ensureLocalContext } from '@/domain/identity/bootstrap';
+import { db } from '@/db/client';
 import { captureStop } from '@/domain/dates/repository';
 import { attachPhoto } from '@/domain/photos/repository';
 import { computeBudgetStatus } from '@/domain/budget/status';
@@ -11,13 +10,14 @@ import { kindsByRecentUse } from '@/domain/stops/recent';
 import { formatMoney, money, parseMajorToMinor } from '@/domain/money/money';
 import type { StopKind } from '@/domain/stops/taxonomy';
 import { persistPickedImage } from '@/media/store';
+import { getAppDeps, getLocalContext } from '@/session';
 import { AmountKeypad } from '@/ui/AmountKeypad';
 import { KindChips } from '@/ui/KindChips';
 import { theme } from '@/ui/theme';
 
 export default function Capture() {
-  const deps = useMemo(() => appDeps('Asia/Manila'), []);
-  const ctx = useMemo(() => ensureLocalContext(db, deps), [deps]);
+  const deps = getAppDeps();
+  const ctx = getLocalContext();
   const kinds = useMemo(() => kindsByRecentUse(db, ctx.coupleId), [ctx.coupleId]);
 
   const [amount, setAmount] = useState('');
