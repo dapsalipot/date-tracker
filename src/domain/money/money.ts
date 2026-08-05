@@ -23,6 +23,10 @@ export function minorExponent(currencyCode: string): number {
   return MINOR_EXPONENTS[currencyCode] ?? 2;
 }
 
+export function currencySymbol(currencyCode: string): string {
+  return SYMBOLS[currencyCode] ?? `${currencyCode} `;
+}
+
 export function money(amountMinor: number, currencyCode: string): Money {
   if (!Number.isInteger(amountMinor)) {
     throw new Error(`amountMinor must be an integer, received ${amountMinor}`);

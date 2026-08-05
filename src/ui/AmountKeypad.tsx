@@ -1,7 +1,17 @@
 import { Pressable, Text, View } from 'react-native';
+import { currencySymbol, minorExponent } from '@/domain/money/money';
 import { theme } from './theme';
 
-const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'] as const;
+const ALL_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'] as const;
+
+/**
+ * Cap on the integer part's digit count, applied regardless of currency.
+ * Nothing stops a runaway string of taps otherwise. PHP dates in the tens of
+ * thousands of pesos are normal (a resort weekend, a ring); 7 digits allows
+ * up to 9,999,999 — two orders of magnitude above that — while still keeping
+ * the amount a bounded, sane number.
+ */
+const MAX_INTEGER_DIGITS = 7;
 
 interface Props {
   value: string;
@@ -16,16 +26,36 @@ interface Props {
  * simply already on screen removes that whole class of delay.
  */
 export function AmountKeypad({ value, onChange, currencyCode }: Props) {
+  // money.ts owns both facts (MINOR_EXPONENTS, SYMBOLS). Reading them here
+  // instead of hardcoding "two decimals" and a PHP-only symbol is what stops
+  // the keypad from accepting precision (e.g. "420.50" for JPY) that
+  // parseMajorToMinor then rejects with no explanation.
+  const exponent = minorExponent(currencyCode);
+  const keys = exponent === 0 ? ALL_KEYS.filter((key) => key !== '.') : ALL_KEYS;
+
   const press = (key: string) => {
     if (key === '⌫') return onChange(value.slice(0, -1));
-    if (key === '.' && value.includes('.')) return;
-    // Two decimal places max — parseMajorToMinor rejects more precision.
-    const [, fraction] = value.split('.');
-    if (fraction !== undefined && fraction.length >= 2 && key !== '⌫') return;
+
+    const [whole, fraction] = value.split('.');
+
+    if (key === '.') {
+      // Zero-exponent currencies (JPY, KRW) have no fractional unit at all —
+      // the key is already filtered out of `keys`, but guard here too in
+      // case press() is ever called from something other than a key render.
+      if (exponent === 0 || fraction !== undefined) return;
+      return onChange(value + key);
+    }
+
+    if (fraction !== undefined) {
+      if (fraction.length >= exponent) return;
+    } else if ((whole ?? '').length >= MAX_INTEGER_DIGITS) {
+      return;
+    }
+
     onChange(value + key);
   };
 
-  const symbol = currencyCode === 'PHP' ? '₱' : `${currencyCode} `;
+  const symbol = currencySymbol(currencyCode);
 
   return (
     <View>
@@ -33,7 +63,7 @@ export function AmountKeypad({ value, onChange, currencyCode }: Props) {
         {symbol}{value === '' ? '0' : value}
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-        {KEYS.map((key) => (
+        {keys.map((key) => (
           <Pressable
             key={key}
             onPress={() => press(key)}
