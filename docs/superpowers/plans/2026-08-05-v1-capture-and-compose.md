@@ -960,15 +960,24 @@ describe('kindsByRecentUse', () => {
     expect(kindsByRecentUse(db, ctx.coupleId).sort()).toEqual([...STOP_KINDS].sort());
   });
 
-  it('puts the most recently used kind first', () => {
+  it('orders by updated_at, not by insertion order', () => {
     const db = createTestDb();
     const ctx = ensureLocalContext(db, DEPS);
     const base = { coupleId: ctx.coupleId, userId: ctx.userId, amountMinor: 1, currencyCode: 'PHP' } as const;
 
-    captureStop(db, DEPS, { ...base, kind: 'gift' });
-    captureStop(db, DEPS, { ...base, kind: 'transport' });
+    // Two clocks, deliberately. `fixedClock` returns one constant nowMs, so
+    // capturing both stops with the same deps writes an identical updated_at —
+    // the ORDER BY would be a tie and SQLite's unspecified tie-break would pick
+    // the winner, letting the assertion pass without proving anything.
+    const LATER = testDeps(1_785_000_900_000, '2026-08-03', 'late');
+    const EARLIER = testDeps(1_785_000_000_000, '2026-08-03', 'early');
 
-    expect(kindsByRecentUse(db, ctx.coupleId)[0]).toBe('transport');
+    captureStop(db, LATER, { ...base, kind: 'gift' });        // inserted first, newer stamp
+    captureStop(db, EARLIER, { ...base, kind: 'transport' }); // inserted last, older stamp
+
+    // Recency and insertion order now point at different kinds, so only
+    // ORDER BY max(updated_at) DESC can return 'gift'.
+    expect(kindsByRecentUse(db, ctx.coupleId)[0]).toBe('gift');
   });
 
   it('never drops or duplicates a kind', () => {
