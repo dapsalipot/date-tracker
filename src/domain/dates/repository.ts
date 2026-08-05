@@ -132,9 +132,6 @@ export function captureStop(
     // attachPhoto takes an AppDatabase, and a drizzle transaction satisfies
     // that type, so the photo row joins this transaction rather than opening
     // its own. No duplicated insert, no second commit point.
-    // attachPhoto takes an AppDatabase, and a drizzle transaction satisfies
-    // that type, so the photo row joins this transaction rather than opening
-    // its own. No duplicated insert, no second commit point.
     if (input.photo) {
       attachPhoto(tx, deps, {
         dateId,
