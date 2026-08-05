@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { stops } from '@/db/schema';
+import { dates, stops } from '@/db/schema';
 import { createTestDb, testDeps } from '@/test/testDb';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop } from '@/domain/dates/repository';
@@ -45,6 +45,20 @@ describe('updateStop', () => {
     expect(stop?.placeName).toBe('Bag of Beans');
     expect(stop?.amountMinor).toBe(45000);
   });
+
+  it('bumps the owning date so the feed sees the change', () => {
+    const { db, dateId, a } = setup();
+    const dateUpdatedAt = () =>
+      db.select({ updatedAt: dates.updatedAt }).from(dates)
+        .where(eq(dates.id, dateId)).all()[0]?.updatedAt;
+    const before = dateUpdatedAt();
+
+    const later = testDeps(1_785_999_999_999, '2026-08-03', 'later');
+    updateStop(db, later, a, { amountMinor: 50000 });
+
+    expect(dateUpdatedAt()).toBe(1_785_999_999_999);
+    expect(dateUpdatedAt()).not.toBe(before);
+  });
 });
 
 describe('deleteStop', () => {
@@ -68,6 +82,20 @@ describe('deleteStop', () => {
     expect(raw).toHaveLength(1);
     expect(raw[0]?.deletedAt).toBe(1_785_000_000_000);
   });
+
+  it('bumps the owning date so the feed sees the change', () => {
+    const { db, dateId, a } = setup();
+    const dateUpdatedAt = () =>
+      db.select({ updatedAt: dates.updatedAt }).from(dates)
+        .where(eq(dates.id, dateId)).all()[0]?.updatedAt;
+    const before = dateUpdatedAt();
+
+    const later = testDeps(1_785_999_999_999, '2026-08-03', 'later');
+    deleteStop(db, later, a);
+
+    expect(dateUpdatedAt()).toBe(1_785_999_999_999);
+    expect(dateUpdatedAt()).not.toBe(before);
+  });
 });
 
 describe('reorderStops', () => {
@@ -77,6 +105,20 @@ describe('reorderStops', () => {
     reorderStops(db, DEPS, dateId, [b, a]);
 
     expect(listStopsForDate(db, dateId).map((s) => s.id)).toEqual([b, a]);
+  });
+
+  it('bumps the owning date so the feed sees the change', () => {
+    const { db, dateId, a, b } = setup();
+    const dateUpdatedAt = () =>
+      db.select({ updatedAt: dates.updatedAt }).from(dates)
+        .where(eq(dates.id, dateId)).all()[0]?.updatedAt;
+    const before = dateUpdatedAt();
+
+    const later = testDeps(1_785_999_999_999, '2026-08-03', 'later');
+    reorderStops(db, later, dateId, [b, a]);
+
+    expect(dateUpdatedAt()).toBe(1_785_999_999_999);
+    expect(dateUpdatedAt()).not.toBe(before);
   });
 
   it('ignores ids that do not belong to the date', () => {

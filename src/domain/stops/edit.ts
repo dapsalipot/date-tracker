@@ -1,5 +1,5 @@
 import { and, asc, eq, isNull } from 'drizzle-orm';
-import { stops } from '@/db/schema';
+import { dates, stops } from '@/db/schema';
 import type { AppDatabase } from '@/db/types';
 import type { Deps } from '@/domain/deps';
 
@@ -44,19 +44,40 @@ export function listStopsForDate(db: AppDatabase, dateId: string): StopRow[] {
   return stopsForDateQuery(db, dateId).all();
 }
 
+/**
+ * Bumps the owning date's updated_at. useLiveQuery subscribes to a query's FROM
+ * table only, so the feed — which selects FROM dates — never sees a write that
+ * touches stops alone. Bumping the parent is what makes a stop edit reach the
+ * feed's totals. It is also correct on its own terms: a date whose stops changed
+ * has changed, and v2's last-write-wins sync needs to know that.
+ */
+function touchOwningDate(tx: AppDatabase, dateId: string, now: number): void {
+  tx.update(dates).set({ updatedAt: now }).where(eq(dates.id, dateId)).run();
+}
+
 export function updateStop(db: AppDatabase, deps: Deps, stopId: string, patch: StopPatch): void {
-  const set: Record<string, unknown> = { updatedAt: deps.clock.nowMs() };
+  const now = deps.clock.nowMs();
+  const set: Record<string, unknown> = { updatedAt: now };
   if (patch.label !== undefined) set.label = patch.label;
   if (patch.subkind !== undefined) set.subkind = patch.subkind;
   if (patch.placeName !== undefined) set.placeName = patch.placeName;
   if (patch.amountMinor !== undefined) set.amountMinor = patch.amountMinor;
 
-  db.update(stops).set(set).where(eq(stops.id, stopId)).run();
+  db.transaction((tx) => {
+    const owner = tx.select({ dateId: stops.dateId }).from(stops).where(eq(stops.id, stopId)).all()[0];
+    tx.update(stops).set(set).where(eq(stops.id, stopId)).run();
+    if (owner) touchOwningDate(tx, owner.dateId, now);
+  });
 }
 
 export function deleteStop(db: AppDatabase, deps: Deps, stopId: string): void {
   const now = deps.clock.nowMs();
-  db.update(stops).set({ deletedAt: now, updatedAt: now }).where(eq(stops.id, stopId)).run();
+
+  db.transaction((tx) => {
+    const owner = tx.select({ dateId: stops.dateId }).from(stops).where(eq(stops.id, stopId)).all()[0];
+    tx.update(stops).set({ deletedAt: now, updatedAt: now }).where(eq(stops.id, stopId)).run();
+    if (owner) touchOwningDate(tx, owner.dateId, now);
+  });
 }
 
 /**
@@ -71,14 +92,19 @@ export function reorderStops(
   orderedIds: readonly string[],
 ): void {
   const now = deps.clock.nowMs();
-  const owned = new Set(listStopsForDate(db, dateId).map((s) => s.id));
 
   db.transaction((tx) => {
+    // Read inside the transaction: a snapshot taken outside could race a
+    // concurrent delete between the read and the writes below, letting a
+    // just-deleted stop be renumbered.
+    const owned = new Set(listStopsForDate(tx, dateId).map((s) => s.id));
+
     let position = 0;
     for (const id of orderedIds) {
       if (!owned.has(id)) continue;
       tx.update(stops).set({ sortOrder: position, updatedAt: now }).where(eq(stops.id, id)).run();
       position += 1;
     }
+    touchOwningDate(tx, dateId, now);
   });
 }
