@@ -256,11 +256,14 @@ const AUG_4 = testDeps(1_785_090_000_000, '2026-08-04', 'aug4');
 
 Run:
 
+Match **import statements**, not substrings — `deps.ts`'s own docstring mentions `expo-*` as prose and would trip a bare substring grep:
+
 ```bash
-grep -rn "expo-" src/domain src/fixtures || echo "CLEAN: no expo imports in domain or fixtures"
+grep -rnE "^\s*(import|export).*from\s+['\"](expo|react|react-native)" src/domain src/fixtures \
+  || echo "CLEAN: zero expo/react imports"
 ```
 
-Expected: `CLEAN: no expo imports in domain or fixtures`
+Expected: `CLEAN: zero expo/react imports`
 
 - [ ] **Step 9: Run the full suite and type check**
 
