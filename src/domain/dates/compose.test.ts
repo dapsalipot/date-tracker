@@ -45,6 +45,15 @@ describe('updateDateDetails', () => {
   });
 });
 
+describe('loadDateDetail', () => {
+  it('does not load a tombstoned date', () => {
+    const { db, dateId } = setup();
+    db.update(dates).set({ deletedAt: 1_785_000_000_000 }).where(eq(dates.id, dateId)).run();
+
+    expect(loadDateDetail(db, dateId)).toBeNull();
+  });
+});
+
 describe('publishDate', () => {
   it('refuses to publish an untitled date', () => {
     const { db, dateId } = setup();

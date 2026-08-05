@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { dates } from '@/db/schema';
 import type { AppDatabase } from '@/db/types';
 import type { Deps } from '@/domain/deps';
@@ -33,7 +33,7 @@ export function dateDetailQuery(db: AppDatabase, dateId: string) {
       coverPhotoId: dates.coverPhotoId,
     })
     .from(dates)
-    .where(eq(dates.id, dateId));
+    .where(and(eq(dates.id, dateId), isNull(dates.deletedAt)));
 }
 
 export function loadDateDetail(db: AppDatabase, dateId: string): DateDetail | null {
