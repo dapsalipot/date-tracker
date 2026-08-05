@@ -1,18 +1,25 @@
-import { useMemo } from 'react';
 import { FlatList, Pressable, SafeAreaView, Text, View } from 'react-native';
+import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { router, useLocalSearchParams } from 'expo-router';
 import { db } from '@/db/client';
-import { loadDateDetail } from '@/domain/dates/compose';
-import { listStopsForDate } from '@/domain/stops/edit';
+import { dateDetailQuery } from '@/domain/dates/compose';
+import { stopsForDateQuery } from '@/domain/stops/edit';
 import { formatMoney, money } from '@/domain/money/money';
 import { theme } from '@/ui/theme';
 
 export default function DateDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const detail = useMemo(() => loadDateDetail(db, id), [id]);
-  const stops = useMemo(() => listStopsForDate(db, id), [id]);
+  const { data: detailRows, updatedAt: detailUpdatedAt } = useLiveQuery(dateDetailQuery(db, id), [id]);
+  const { data: stops } = useLiveQuery(stopsForDateQuery(db, id), [id]);
+  const detail = detailRows[0] ?? null;
 
+  // useLiveQuery returns [] on its first render, before the query has ever run,
+  // so an empty result is ambiguous between "still loading" and "deleted". Only
+  // updatedAt distinguishes them — it stays undefined until the first resolve.
   if (!detail) {
+    if (detailUpdatedAt === undefined) {
+      return <SafeAreaView style={{ flex: 1, backgroundColor: theme.color.cream }} />;
+    }
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.color.cream, justifyContent: 'center', padding: theme.space.lg }}>
         <Text style={{ color: theme.color.ink }}>That date no longer exists.</Text>
