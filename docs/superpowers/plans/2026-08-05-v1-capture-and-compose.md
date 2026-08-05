@@ -857,33 +857,46 @@ Install the picker:
 npx expo install expo-image-picker expo-file-system
 ```
 
-Create `src/media/store.ts`:
+Create `src/media/store.ts`.
+
+**Use the current `Paths`/`File`/`Directory` class API, not `expo-file-system/legacy`.** In
+expo-file-system 57 the old async functions (`documentDirectory`, `getInfoAsync`,
+`copyAsync`) are gone from the main entry — they survive only under `/legacy` as a
+deprecation shim whose main-entry stubs throw at runtime. A new project should not build on
+a shim. The current API is also **synchronous**, so this function needs no promise.
+
+Verify the exact member names against `node_modules/expo-file-system/build/*.d.ts` before
+writing — do not assume this sketch is exact:
 
 ```ts
-import * as FileSystem from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 
-const PHOTO_DIR = `${FileSystem.documentDirectory}photos/`;
-
-async function ensureDir(): Promise<void> {
-  const info = await FileSystem.getInfoAsync(PHOTO_DIR);
-  if (!info.exists) {
-    await FileSystem.makeDirectoryAsync(PHOTO_DIR, { intermediates: true });
-  }
-}
+const PHOTO_DIR_NAME = 'photos';
 
 /**
- * Copies a picked image into the app's documents directory and returns the new
- * uri. The picker hands back a cache-directory path that the OS may reclaim at
- * any time, so a photo referenced straight from the picker can vanish between
- * sessions — the copy is what makes the reference durable.
+ * Copies a picked image into the app's documents directory and returns its new
+ * uri. The picker hands back a path in the OS cache directory, which the system
+ * may reclaim at any time — a photo referenced straight from the picker can
+ * silently vanish between sessions. The copy is what makes the reference durable.
  */
-export async function persistPickedImage(uri: string, fileName: string): Promise<string> {
-  await ensureDir();
-  const target = `${PHOTO_DIR}${fileName}`;
-  await FileSystem.copyAsync({ from: uri, to: target });
-  return target;
+export function persistPickedImage(uri: string, fileName: string): string {
+  const dir = new Directory(Paths.document, PHOTO_DIR_NAME);
+  if (!dir.exists) {
+    dir.create({ intermediates: true, idempotent: true });
+  }
+
+  const target = new File(dir, fileName);
+  // copySync, not copy: `copy` returns Promise<void>, so calling it from a
+  // synchronous function would be fire-and-forget — the photos row would be
+  // written pointing at a file that had not finished copying.
+  new File(uri).copySync(target);
+  return target.uri;
 }
 ```
+
+`exists`, `create` and `copySync` are inherited from `NativeFileSystemDirectory` /
+`NativeFileSystemFile` in `build/internal/NativeFileSystem.types.d.ts`, not declared on the
+public `Directory`/`File` classes — look there when checking signatures.
 
 This file lives in `src/media/`, not `src/domain/`, precisely because it imports `expo-*`.
 
