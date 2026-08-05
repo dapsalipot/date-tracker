@@ -15,7 +15,7 @@ describe('seedTwelveMonths', () => {
 
     seedTwelveMonths(db, ctx.coupleId, ctx.userId, '2026-08-03', AUG_3);
 
-    const feed = listFeedDates(db, ctx.coupleId);
+    const feed = listFeedDates(db, ctx);
     // Exactly 48: offsets step 7 days with at most 2 days of jitter, so every
     // generated day is distinct. A loose `>= 36` would let a future change
     // silently drop a quarter of the fixtures without failing.
@@ -30,7 +30,7 @@ describe('seedTwelveMonths', () => {
 
     seedTwelveMonths(db, ctx.coupleId, ctx.userId, '2026-08-03', AUG_3);
 
-    const spentMonths = new Set(listFeedDates(db, ctx.coupleId).map((d) => d.occurredOn.slice(0, 7)));
+    const spentMonths = new Set(listFeedDates(db, ctx).map((d) => d.occurredOn.slice(0, 7)));
     const budgetedMonths = new Set(
       db.select().from(budgets).all().map((b) => b.periodMonth),
     );
@@ -46,7 +46,7 @@ describe('seedTwelveMonths', () => {
 
     seedTwelveMonths(db, ctx.coupleId, ctx.userId, '2026-08-03', AUG_3);
 
-    expect(computeBudgetStatus(db, ctx.coupleId, AUG_3).budgetMinor).toBe(800000);
+    expect(computeBudgetStatus(db, ctx, AUG_3).budgetMinor).toBe(800000);
   });
 
   it('is deterministic', () => {
@@ -54,7 +54,7 @@ describe('seedTwelveMonths', () => {
       const db = createTestDb();
       const ctx = ensureLocalContext(db, AUG_3);
       seedTwelveMonths(db, ctx.coupleId, ctx.userId, '2026-08-03', AUG_3);
-      return listFeedDates(db, ctx.coupleId).map((d) => d.totalMinor);
+      return listFeedDates(db, ctx).map((d) => d.totalMinor);
     };
 
     expect(runOnce()).toEqual(runOnce());

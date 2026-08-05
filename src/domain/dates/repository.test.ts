@@ -174,12 +174,13 @@ describe('captureStop', () => {
 describe('listFeedDates', () => {
   it('returns dates with stop counts and totals, newest first', () => {
     const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
 
     captureStop(db, AUG_3, { coupleId, userId, kind: 'food', amountMinor: 42000, currencyCode: 'PHP' });
     captureStop(db, AUG_3, { coupleId, userId, kind: 'transport', amountMinor: 68000, currencyCode: 'PHP' });
     captureStop(db, AUG_4, { coupleId, userId, kind: 'food', amountMinor: 10000, currencyCode: 'PHP' });
 
-    const feed = listFeedDates(db, coupleId);
+    const feed = listFeedDates(db, scope);
 
     expect(feed).toHaveLength(2);
     expect(feed[0]?.occurredOn).toBe('2026-08-04');
@@ -189,6 +190,7 @@ describe('listFeedDates', () => {
 
   it('excludes tombstoned stops from counts and totals', () => {
     const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
 
     captureStop(db, AUG_3, { coupleId, userId, kind: 'food', amountMinor: 42000, currencyCode: 'PHP' });
     const removed = captureStop(db, AUG_3, {
@@ -197,13 +199,14 @@ describe('listFeedDates', () => {
 
     db.update(stops).set({ deletedAt: 1 }).where(eq(stops.id, removed.stopId)).run();
 
-    const feed = listFeedDates(db, coupleId);
+    const feed = listFeedDates(db, scope);
     expect(feed[0]?.stopCount).toBe(1);
     expect(feed[0]?.totalMinor).toBe(42000);
   });
 
   it('keeps a date visible when every one of its stops is tombstoned', () => {
     const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
 
     const only = captureStop(db, AUG_3, {
       coupleId, userId, kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
@@ -212,7 +215,7 @@ describe('listFeedDates', () => {
 
     // Guards the leftJoin ON-clause: moving isNull(stops.deletedAt) into the
     // WHERE clause would make this date vanish from the feed entirely.
-    const feed = listFeedDates(db, coupleId);
+    const feed = listFeedDates(db, scope);
     expect(feed).toHaveLength(1);
     expect(feed[0]?.stopCount).toBe(0);
     expect(feed[0]?.totalMinor).toBe(0);
@@ -220,6 +223,7 @@ describe('listFeedDates', () => {
 
   it('excludes soft-deleted dates and stops', () => {
     const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
 
     const kept = captureStop(db, AUG_3, {
       coupleId, userId, kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
@@ -230,8 +234,34 @@ describe('listFeedDates', () => {
 
     db.update(dates).set({ deletedAt: 1 }).where(eq(dates.id, removed.dateId)).run();
 
-    const feed = listFeedDates(db, coupleId);
+    const feed = listFeedDates(db, scope);
     expect(feed).toHaveLength(1);
     expect(feed[0]?.id).toBe(kept.dateId);
+  });
+
+  it('excludes stops in other currencies from counts and totals', () => {
+    const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+
+    captureStop(db, AUG_3, { coupleId, userId, kind: 'food', amountMinor: 10000, currencyCode: 'PHP' });
+    captureStop(db, AUG_3, { coupleId, userId, kind: 'food', amountMinor: 10000, currencyCode: 'JPY' });
+    captureStop(db, AUG_4, { coupleId, userId, kind: 'food', amountMinor: 5000, currencyCode: 'JPY' });
+
+    // Both are 10000 minor units, but ₱100.00 and ¥10000 are not ₱200.00.
+    const feed = listFeedDates(db, scope);
+    expect(feed).toHaveLength(2);
+
+    const aug3 = feed.find((d) => d.occurredOn === '2026-08-03');
+    expect(aug3?.totalMinor).toBe(10000);
+    expect(aug3?.stopCount).toBe(1);
+    expect(aug3?.currencyCode).toBe('PHP');
+
+    // A date whose only stop is in another currency must still appear in the
+    // feed — the currency predicate lives in the ON clause, not the WHERE —
+    // with a zero total rather than vanishing entirely.
+    const aug4 = feed.find((d) => d.occurredOn === '2026-08-04');
+    expect(aug4?.stopCount).toBe(0);
+    expect(aug4?.totalMinor).toBe(0);
+    expect(aug4?.currencyCode).toBe('PHP');
   });
 });

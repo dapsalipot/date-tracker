@@ -29,15 +29,12 @@ export default function Feed() {
 
   // useLiveQuery re-runs whenever the underlying tables change, so no state
   // library and no manual refresh are needed. SQLite is the store.
-  const { data } = useLiveQuery(feedDatesQuery(db, ctx.coupleId));
-  const dates = useMemo(() => data.map(toFeedDate), [data]);
+  const { data } = useLiveQuery(feedDatesQuery(db, ctx));
+  const dates = useMemo(() => data.map((row) => toFeedDate(row, ctx.currencyCode)), [data, ctx.currencyCode]);
 
   // Budget spans two queries, so it cannot be a single live query. Recomputing
   // it when `data` changes is sufficient: every stop write changes `data`.
-  const budget = useMemo(
-    () => computeBudgetStatus(db, ctx.coupleId, deps),
-    [ctx.coupleId, deps, data],
-  );
+  const budget = useMemo(() => computeBudgetStatus(db, ctx, deps), [ctx, deps, data]);
 
   const remaining =
     budget.remainingMinor === null

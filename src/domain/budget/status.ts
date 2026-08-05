@@ -2,6 +2,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import { budgets, dates, stops } from '@/db/schema';
 import type { AppDatabase } from '@/db/types';
 import type { Deps } from '@/domain/deps';
+import type { CoupleScope } from '@/domain/scope';
 import { daysRemainingIn, periodMonthFor } from './period';
 
 export interface BudgetStatus {
@@ -50,7 +51,7 @@ export function setBudget(
  */
 export function computeBudgetStatus(
   db: AppDatabase,
-  coupleId: string,
+  scope: CoupleScope,
   deps: Deps,
 ): BudgetStatus {
   const today = deps.clock.todayLocal();
@@ -62,7 +63,8 @@ export function computeBudgetStatus(
     .innerJoin(dates, eq(stops.dateId, dates.id))
     .where(
       and(
-        eq(dates.coupleId, coupleId),
+        eq(dates.coupleId, scope.coupleId),
+        eq(stops.currencyCode, scope.currencyCode),
         isNull(dates.deletedAt),
         isNull(stops.deletedAt),
         sql`substr(${dates.occurredOn}, 1, 7) = ${periodMonth}`,
@@ -77,7 +79,7 @@ export function computeBudgetStatus(
     .from(budgets)
     .where(
       and(
-        eq(budgets.coupleId, coupleId),
+        eq(budgets.coupleId, scope.coupleId),
         eq(budgets.periodMonth, periodMonth),
         isNull(budgets.deletedAt),
       ),

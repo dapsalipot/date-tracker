@@ -2,6 +2,7 @@ import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { dates, stops } from '@/db/schema';
 import type { AppDatabase } from '@/db/types';
 import type { Deps } from '@/domain/deps';
+import type { CoupleScope } from '@/domain/scope';
 import type { StopKind } from '@/domain/stops/taxonomy';
 
 export interface CaptureStopInput {
@@ -132,7 +133,7 @@ export interface FeedDateRow {
  * executed result are exposed separately: screens use the builder for
  * reactivity, tests use `listFeedDates` for a plain value.
  */
-export function feedDatesQuery(db: AppDatabase, coupleId: string) {
+export function feedDatesQuery(db: AppDatabase, scope: CoupleScope) {
   return db
     .select({
       id: dates.id,
@@ -143,13 +144,22 @@ export function feedDatesQuery(db: AppDatabase, coupleId: string) {
       totalMinor: sql<number>`coalesce(sum(${stops.amountMinor}), 0)`,
     })
     .from(dates)
-    .leftJoin(stops, and(eq(stops.dateId, dates.id), isNull(stops.deletedAt)))
-    .where(and(eq(dates.coupleId, coupleId), isNull(dates.deletedAt)))
+    .leftJoin(
+      stops,
+      and(
+        eq(stops.dateId, dates.id),
+        isNull(stops.deletedAt),
+        // In the ON clause, not the WHERE: a date whose stops are all in
+        // another currency must still appear, with a zero total.
+        eq(stops.currencyCode, scope.currencyCode),
+      ),
+    )
+    .where(and(eq(dates.coupleId, scope.coupleId), isNull(dates.deletedAt)))
     .groupBy(dates.id)
     .orderBy(desc(dates.occurredOn));
 }
 
-export function toFeedDate(row: FeedDateRow): FeedDate {
+export function toFeedDate(row: FeedDateRow, currencyCode: string): FeedDate {
   return {
     id: row.id,
     title: row.title,
@@ -157,10 +167,10 @@ export function toFeedDate(row: FeedDateRow): FeedDate {
     status: row.status,
     stopCount: Number(row.stopCount),
     totalMinor: Number(row.totalMinor),
-    currencyCode: 'PHP',
+    currencyCode,
   };
 }
 
-export function listFeedDates(db: AppDatabase, coupleId: string): FeedDate[] {
-  return feedDatesQuery(db, coupleId).all().map(toFeedDate);
+export function listFeedDates(db: AppDatabase, scope: CoupleScope): FeedDate[] {
+  return feedDatesQuery(db, scope).all().map((row) => toFeedDate(row, scope.currencyCode));
 }

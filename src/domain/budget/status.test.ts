@@ -18,8 +18,9 @@ function setup() {
 describe('computeBudgetStatus', () => {
   it('reports null budget when none is set', () => {
     const { db, coupleId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
 
-    const status = computeBudgetStatus(db, coupleId, AUG_30);
+    const status = computeBudgetStatus(db, scope, AUG_30);
 
     expect(status.budgetMinor).toBeNull();
     expect(status.remainingMinor).toBeNull();
@@ -29,11 +30,12 @@ describe('computeBudgetStatus', () => {
 
   it('subtracts this month\'s spend from the budget', () => {
     const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
     setBudget(db, coupleId, '2026-08', 800000, AUG_30);
 
     captureStop(db, AUG_30, { coupleId, userId, kind: 'food', amountMinor: 234000, currencyCode: 'PHP' });
 
-    const status = computeBudgetStatus(db, coupleId, AUG_30);
+    const status = computeBudgetStatus(db, scope, AUG_30);
 
     expect(status.spentMinor).toBe(234000);
     expect(status.remainingMinor).toBe(566000);
@@ -43,11 +45,12 @@ describe('computeBudgetStatus', () => {
 
   it('goes negative when over budget rather than clamping', () => {
     const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
     setBudget(db, coupleId, '2026-08', 100000, AUG_30);
 
     captureStop(db, AUG_30, { coupleId, userId, kind: 'food', amountMinor: 150000, currencyCode: 'PHP' });
 
-    const status = computeBudgetStatus(db, coupleId, AUG_30);
+    const status = computeBudgetStatus(db, scope, AUG_30);
 
     expect(status.remainingMinor).toBe(-50000);
     expect(status.isOverBudget).toBe(true);
@@ -55,12 +58,13 @@ describe('computeBudgetStatus', () => {
 
   it('excludes spend from other months', () => {
     const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
     setBudget(db, coupleId, '2026-09', 800000, SEP_1);
 
     captureStop(db, AUG_30, { coupleId, userId, kind: 'food', amountMinor: 234000, currencyCode: 'PHP' });
     captureStop(db, SEP_1, { coupleId, userId, kind: 'food', amountMinor: 50000, currencyCode: 'PHP' });
 
-    const status = computeBudgetStatus(db, coupleId, SEP_1);
+    const status = computeBudgetStatus(db, scope, SEP_1);
 
     expect(status.periodMonth).toBe('2026-09');
     expect(status.spentMinor).toBe(50000);
@@ -68,6 +72,7 @@ describe('computeBudgetStatus', () => {
 
   it("attributes spend by the date's occurred_on, not the stop's own timestamp", () => {
     const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
     setBudget(db, coupleId, '2026-08', 800000, AUG_30);
 
     const captured = captureStop(db, AUG_30, {
@@ -83,15 +88,27 @@ describe('computeBudgetStatus', () => {
       .where(eq(stops.id, captured.stopId))
       .run();
 
-    expect(computeBudgetStatus(db, coupleId, AUG_30).spentMinor).toBe(234000);
+    expect(computeBudgetStatus(db, scope, AUG_30).spentMinor).toBe(234000);
   });
 
   it('overwrites an existing budget for the same period', () => {
     const { db, coupleId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
 
     setBudget(db, coupleId, '2026-08', 800000, AUG_30);
     setBudget(db, coupleId, '2026-08', 500000, AUG_30);
 
-    expect(computeBudgetStatus(db, coupleId, AUG_30).budgetMinor).toBe(500000);
+    expect(computeBudgetStatus(db, scope, AUG_30).budgetMinor).toBe(500000);
+  });
+
+  it('excludes spend in other currencies', () => {
+    const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+    setBudget(db, coupleId, '2026-08', 800000, AUG_30);
+
+    captureStop(db, AUG_30, { coupleId, userId, kind: 'food', amountMinor: 234000, currencyCode: 'PHP' });
+    captureStop(db, AUG_30, { coupleId, userId, kind: 'food', amountMinor: 500000, currencyCode: 'JPY' });
+
+    expect(computeBudgetStatus(db, scope, AUG_30).spentMinor).toBe(234000);
   });
 });
