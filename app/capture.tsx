@@ -23,6 +23,7 @@ export default function Capture() {
   const [amount, setAmount] = useState('');
   const [kind, setKind] = useState<StopKind>(kinds[0] ?? 'food');
   const [pendingPhoto, setPendingPhoto] = useState<{ uri: string; width: number; height: number } | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const budget = useMemo(() => computeBudgetStatus(db, ctx, deps), [ctx, deps]);
   const remaining =
@@ -44,6 +45,8 @@ export default function Capture() {
   };
 
   const save = async () => {
+    if (saving) return;
+
     let amountMinor: number;
     try {
       amountMinor = parseMajorToMinor(amount === '' ? '0' : amount, ctx.currencyCode).amountMinor;
@@ -52,26 +55,49 @@ export default function Capture() {
       return;
     }
 
-    const result = captureStop(db, deps, {
-      coupleId: ctx.coupleId,
-      userId: ctx.userId,
-      kind,
-      amountMinor,
-      currencyCode: ctx.currencyCode,
-    });
+    setSaving(true);
+    try {
+      // Persist the photo to disk before writing anything to the database.
+      // persistPickedImage is a pure file copy with no database effect, so if
+      // it throws nothing has been written yet and a retry is clean. The
+      // reverse order — commit the stop, then copy the file — meant a copy
+      // failure left a stop already saved with no message and no navigation,
+      // so the user's natural retry wrote a second, duplicate stop.
+      let durablePhotoUri: string | null = null;
+      if (pendingPhoto) {
+        const photoFileName = `${deps.newId()}.jpg`;
+        durablePhotoUri = persistPickedImage(pendingPhoto.uri, photoFileName);
+      }
 
-    if (pendingPhoto) {
-      const durable = persistPickedImage(pendingPhoto.uri, `${result.stopId}.jpg`);
-      attachPhoto(db, deps, {
-        dateId: result.dateId,
-        stopId: result.stopId,
-        localUri: durable,
-        width: pendingPhoto.width,
-        height: pendingPhoto.height,
+      const result = captureStop(db, deps, {
+        coupleId: ctx.coupleId,
+        userId: ctx.userId,
+        kind,
+        amountMinor,
+        currencyCode: ctx.currencyCode,
       });
-    }
 
-    router.back();
+      if (pendingPhoto && durablePhotoUri) {
+        attachPhoto(db, deps, {
+          dateId: result.dateId,
+          stopId: result.stopId,
+          localUri: durablePhotoUri,
+          width: pendingPhoto.width,
+          height: pendingPhoto.height,
+        });
+      }
+
+      router.back();
+    } catch {
+      // Leave the sheet open and the amount untouched — the work is still
+      // there, whatever failed underneath.
+      Alert.alert(
+        'Could not save that',
+        'Something went wrong saving this expense to your device. Your amount is still here — try Save again.',
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -98,7 +124,8 @@ export default function Capture() {
         </Pressable>
         <Pressable
           onPress={save}
-          style={{ flex: 1, alignItems: 'center', paddingVertical: theme.space.md, borderRadius: theme.radius.md, backgroundColor: theme.color.ink }}
+          disabled={saving}
+          style={{ flex: 1, alignItems: 'center', paddingVertical: theme.space.md, borderRadius: theme.radius.md, backgroundColor: theme.color.ink, opacity: saving ? 0.5 : 1 }}
         >
           <Text style={{ color: theme.color.cream, fontWeight: '700', fontSize: 16 }}>Save</Text>
         </Pressable>
