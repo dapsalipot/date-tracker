@@ -5,21 +5,26 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { db } from '@/db/client';
 import { getAppDeps } from '@/session';
 import { deleteStop, stopsForDateQuery, updateStop } from '@/domain/stops/edit';
-import { minorExponent, parseMajorToMinor } from '@/domain/money/money';
+import { formatMoney, money, parseMajorToMinor } from '@/domain/money/money';
 import type { StopKind } from '@/domain/stops/taxonomy';
 import { AmountKeypad } from '@/ui/AmountKeypad';
 import { SubkindChips } from '@/ui/SubkindChips';
 import { theme } from '@/ui/theme';
 
-/** Minor units back to the major-unit string the keypad edits. */
-function minorToKeypadValue(amountMinor: number, currencyCode: string): string {
-  const exponent = minorExponent(currencyCode);
-  if (exponent === 0) return String(amountMinor);
-  const divisor = 10 ** exponent;
-  const whole = Math.trunc(amountMinor / divisor);
-  const fraction = Math.abs(amountMinor % divisor).toString().padStart(exponent, '0');
-  return `${whole}.${fraction}`;
-}
+/**
+ * The keypad starts EMPTY rather than seeded with the saved amount.
+ *
+ * AmountKeypad is an append-only widget that caps the fraction at the
+ * currency's minor-unit exponent. A seeded "420.00" is already at that cap, so
+ * every digit key silently no-ops and only backspace works — editing the amount
+ * of any 2-decimal currency becomes impossible. The keypad returns before
+ * calling onChange, so the screen cannot intercept the tap and recover.
+ *
+ * Empty means "leave the amount alone": `save` omits amountMinor from the patch
+ * entirely, and `updateStop` writes only the keys it is given. The saved amount
+ * is shown above the keypad so the field is never ambiguous.
+ */
+const AMOUNT_UNCHANGED = '';
 
 export default function StopEditor() {
   const { id, stopId } = useLocalSearchParams<{ id: string; stopId: string }>();
@@ -30,11 +35,13 @@ export default function StopEditor() {
   const [draft, setDraft] = useState<{
     label: string; placeName: string; subkind: string | null; amount: string;
   } | null>(null);
+  const [leaving, setLeaving] = useState(false);
 
   // useLiveQuery returns [] before its first resolve, so an absent stop is
-  // ambiguous between loading and deleted until updatedAt is set.
+  // ambiguous between loading and deleted until updatedAt is set. A third case:
+  // we deleted it ourselves and are already navigating away.
   if (!stop) {
-    if (updatedAt === undefined) {
+    if (updatedAt === undefined || leaving) {
       return <SafeAreaView style={{ flex: 1, backgroundColor: theme.color.cream }} />;
     }
     return (
@@ -50,25 +57,30 @@ export default function StopEditor() {
     label: stop.label ?? '',
     placeName: stop.placeName ?? '',
     subkind: stop.subkind,
-    amount: minorToKeypadValue(stop.amountMinor, stop.currencyCode),
+    amount: AMOUNT_UNCHANGED,
   };
   const patch = (next: Partial<typeof current>) => setDraft({ ...current, ...next });
 
   const save = () => {
-    let amountMinor: number;
-    try {
-      amountMinor = parseMajorToMinor(current.amount === '' ? '0' : current.amount, stop.currencyCode).amountMinor;
-    } catch {
-      Alert.alert('That amount looks off', 'Enter a number like 420 or 420.50.');
-      return;
+    let amountPatch: { amountMinor?: number } = {};
+    if (current.amount !== AMOUNT_UNCHANGED) {
+      try {
+        amountPatch = {
+          amountMinor: parseMajorToMinor(current.amount, stop.currencyCode).amountMinor,
+        };
+      } catch {
+        Alert.alert('That amount looks off', 'Enter a number like 420 or 420.50.');
+        return;
+      }
     }
 
     updateStop(db, deps, stop.id, {
       label: current.label.trim() === '' ? null : current.label.trim(),
       placeName: current.placeName.trim() === '' ? null : current.placeName.trim(),
       subkind: current.subkind,
-      amountMinor,
+      ...amountPatch,
     });
+    setLeaving(true);
     router.back();
   };
 
@@ -79,6 +91,12 @@ export default function StopEditor() {
         text: 'Remove',
         style: 'destructive',
         onPress: () => {
+          // Flag before the write: the live query updates on a microtask fired
+          // from a native change event, while a popped screen stays mounted for
+          // its exit animation. Without this the row vanishes mid-transition and
+          // the user sees "That stop is gone." as the reward for a successful,
+          // deliberate delete.
+          setLeaving(true);
           deleteStop(db, deps, stop.id);
           router.back();
         },
@@ -91,6 +109,12 @@ export default function StopEditor() {
       <ScrollView contentContainerStyle={{ padding: theme.space.md, gap: theme.space.md }}>
         <Text style={{ fontSize: 11, letterSpacing: 1, color: theme.color.muted }}>
           {stop.kind.toUpperCase()}
+        </Text>
+
+        <Text style={{ color: theme.color.muted }}>
+          {current.amount === AMOUNT_UNCHANGED
+            ? `Now ${formatMoney(money(stop.amountMinor, stop.currencyCode))} — type to change it`
+            : 'New amount'}
         </Text>
 
         <AmountKeypad
