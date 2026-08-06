@@ -3,8 +3,9 @@ import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { router, useLocalSearchParams } from 'expo-router';
 import { db } from '@/db/client';
 import { dateDetailQuery } from '@/domain/dates/compose';
-import { stopsForDateQuery } from '@/domain/stops/edit';
+import { reorderStops, stopsForDateQuery } from '@/domain/stops/edit';
 import { formatMoney, money } from '@/domain/money/money';
+import { getAppDeps } from '@/session';
 import { theme } from '@/ui/theme';
 
 export default function DateDetail() {
@@ -12,6 +13,20 @@ export default function DateDetail() {
   const { data: detailRows, updatedAt: detailUpdatedAt } = useLiveQuery(dateDetailQuery(db, id), [id]);
   const { data: stops } = useLiveQuery(stopsForDateQuery(db, id), [id]);
   const detail = detailRows[0] ?? null;
+
+  const move = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= stops.length) return;
+
+    const ordered = stops.map((s) => s.id);
+    const moved = ordered[index];
+    const displaced = ordered[target];
+    if (moved === undefined || displaced === undefined) return;
+    ordered[index] = displaced;
+    ordered[target] = moved;
+
+    reorderStops(db, getAppDeps(), id, ordered);
+  };
 
   // useLiveQuery returns [] on its first render, before the query has ever run,
   // so an empty result is ambiguous between "still loading" and "deleted". Only
@@ -42,9 +57,18 @@ export default function DateDetail() {
         data={stops}
         keyExtractor={(s) => s.id}
         contentContainerStyle={{ paddingHorizontal: theme.space.md }}
-        renderItem={({ item }) => (
-          <Pressable onPress={() => router.push(`/date/${id}/stop/${item.id}`)}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: theme.space.sm, borderBottomWidth: 1, borderBottomColor: theme.color.line }}>
+        renderItem={({ item, index }) => (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: theme.space.sm, borderBottomWidth: 1, borderBottomColor: theme.color.line }}>
+            {/*
+              Only this column navigates. The reorder arrows below are a
+              sibling, not nested inside this Pressable: a disabled Pressable
+              (the up arrow on row 0, the down arrow on the last row) does not
+              claim the responder, so a nested disabled arrow would let the
+              touch fall through to this row's onPress and navigate instead
+              of no-opping. Keeping them as siblings avoids that regardless of
+              disabled state.
+            */}
+            <Pressable onPress={() => router.push(`/date/${id}/stop/${item.id}`)} style={{ flex: 1 }}>
               <View>
                 <Text style={{ color: theme.color.ink }}>{item.label ?? item.kind}</Text>
                 {item.placeName !== null && (
@@ -54,11 +78,30 @@ export default function DateDetail() {
                   </Text>
                 )}
               </View>
+            </Pressable>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.sm }}>
+              <Pressable
+                onPress={() => move(index, -1)}
+                hitSlop={8}
+                disabled={index === 0}
+                style={{ opacity: index === 0 ? 0.25 : 1 }}
+              >
+                <Text style={{ color: theme.color.muted, fontSize: 18 }}>↑</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => move(index, 1)}
+                hitSlop={8}
+                disabled={index === stops.length - 1}
+                style={{ opacity: index === stops.length - 1 ? 0.25 : 1 }}
+              >
+                <Text style={{ color: theme.color.muted, fontSize: 18 }}>↓</Text>
+              </Pressable>
               <Text style={{ color: theme.color.ink, fontWeight: '700' }}>
                 {formatMoney(money(item.amountMinor, item.currencyCode))}
               </Text>
             </View>
-          </Pressable>
+          </View>
         )}
       />
 
