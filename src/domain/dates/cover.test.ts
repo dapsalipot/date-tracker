@@ -73,6 +73,17 @@ describe('setCoverPhoto', () => {
     expect(coverOf(db, dateId)).toBeNull();
   });
 
+  it('clears the cover on a date that never had a photo', () => {
+    const { db, dateId } = setup();
+
+    // Clearing must not go through the ownership lookup: the composer offers
+    // "no cover" for every date, including one whose only photo was just
+    // removed. Requiring a photo to exist here would throw on the exact
+    // screen the user reaches for to undo a cover they regret.
+    expect(() => setCoverPhoto(db, DEPS, dateId, null)).not.toThrow();
+    expect(coverOf(db, dateId)).toBeNull();
+  });
+
   it('bumps the date so the feed sees the new cover', () => {
     const { db, dateId } = setup();
     const photoId = attachPhoto(db, DEPS, {
