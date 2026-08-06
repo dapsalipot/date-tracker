@@ -1,8 +1,9 @@
-import { FlatList, Pressable, SafeAreaView, Text, View } from 'react-native';
+import { FlatList, Image, Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { router, useLocalSearchParams } from 'expo-router';
 import { db } from '@/db/client';
 import { dateDetailQuery } from '@/domain/dates/compose';
+import { photosForDateQuery } from '@/domain/photos/repository';
 import { reorderStops, stopsForDateQuery } from '@/domain/stops/edit';
 import { formatMoney, money } from '@/domain/money/money';
 import { getAppDeps } from '@/session';
@@ -12,6 +13,7 @@ export default function DateDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: detailRows, updatedAt: detailUpdatedAt } = useLiveQuery(dateDetailQuery(db, id), [id]);
   const { data: stops } = useLiveQuery(stopsForDateQuery(db, id), [id]);
+  const { data: photos } = useLiveQuery(photosForDateQuery(db, id), [id]);
   const detail = detailRows[0] ?? null;
 
   const move = (index: number, direction: -1 | 1) => {
@@ -52,6 +54,21 @@ export default function DateDetail() {
           {detail.title ?? 'Untitled date'}
         </Text>
       </View>
+
+      {photos.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: theme.space.sm, paddingHorizontal: theme.space.md, paddingBottom: theme.space.sm }}>
+          {photos.map((photo) =>
+            photo.localUri === null ? null : (
+              <Image
+                key={photo.id}
+                source={{ uri: photo.localUri }}
+                style={{ width: 96, height: 120, borderRadius: theme.radius.md }}
+                resizeMode="cover"
+              />
+            ),
+          )}
+        </ScrollView>
+      )}
 
       <FlatList
         data={stops}
