@@ -43,12 +43,22 @@ export default function DateDetail() {
         keyExtractor={(s) => s.id}
         contentContainerStyle={{ paddingHorizontal: theme.space.md }}
         renderItem={({ item }) => (
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: theme.space.sm, borderBottomWidth: 1, borderBottomColor: theme.color.line }}>
-            <Text style={{ color: theme.color.ink }}>{item.label ?? item.kind}</Text>
-            <Text style={{ color: theme.color.ink, fontWeight: '700' }}>
-              {formatMoney(money(item.amountMinor, item.currencyCode))}
-            </Text>
-          </View>
+          <Pressable onPress={() => router.push(`/date/${id}/stop/${item.id}`)}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: theme.space.sm, borderBottomWidth: 1, borderBottomColor: theme.color.line }}>
+              <View>
+                <Text style={{ color: theme.color.ink }}>{item.label ?? item.kind}</Text>
+                {item.placeName !== null && (
+                  <Text style={{ color: theme.color.muted, fontSize: 12, marginTop: 2 }}>
+                    {item.placeName}
+                    {item.subkind !== null ? ` · ${item.subkind}` : ''}
+                  </Text>
+                )}
+              </View>
+              <Text style={{ color: theme.color.ink, fontWeight: '700' }}>
+                {formatMoney(money(item.amountMinor, item.currencyCode))}
+              </Text>
+            </View>
+          </Pressable>
         )}
       />
 
