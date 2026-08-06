@@ -7,6 +7,7 @@ import { toFeedDate } from '@/domain/dates/repository';
 import { draftDatesQuery, publishedDatesQuery } from '@/domain/dates/drafts';
 import { computeBudgetStatus } from '@/domain/budget/status';
 import { formatMoney, money } from '@/domain/money/money';
+import { FeedCard } from '@/render/FeedCard';
 import { seedTwelveMonths } from '@/fixtures/seed';
 import { getAppDeps, getLocalContext } from '@/session';
 import { theme } from '@/ui/theme';
@@ -77,28 +78,7 @@ export default function Feed() {
           ) : null
         }
         renderItem={({ item }) => (
-          <Pressable onPress={() => router.push(`/date/${item.id}`)}>
-            <View
-              style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: theme.radius.md,
-                borderWidth: 1,
-                borderColor: theme.color.line,
-                padding: theme.space.md,
-                marginBottom: theme.space.sm,
-              }}
-            >
-              <Text style={{ fontSize: 11, letterSpacing: 1, color: theme.color.muted }}>
-                {item.occurredOn.toUpperCase()} · {item.status.toUpperCase()}
-              </Text>
-              <Text style={{ fontSize: 17, fontWeight: '700', color: theme.color.ink, marginTop: 2 }}>
-                {item.title ?? 'Untitled date'}
-              </Text>
-              <Text style={{ color: theme.color.muted, marginTop: 4 }}>
-                {item.stopCount} stops · {formatMoney(money(item.totalMinor, item.currencyCode))}
-              </Text>
-            </View>
-          </Pressable>
+          <FeedCard date={item} onPress={() => router.push(`/date/${item.id}`)} />
         )}
       />
 
