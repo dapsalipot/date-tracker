@@ -34,18 +34,22 @@ export default function Compose() {
 
   const addPhoto = async () => {
     if (adding) return;
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      // Spec §10: a date without photos is fully valid. Never a dead end.
-      Alert.alert('Photos unavailable', 'You can still title and publish this date.');
-      return;
-    }
-    const picked = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
-    const asset = picked.assets?.[0];
-    if (picked.canceled || !asset) return;
-
+    // Claim the flag BEFORE the first await, not after. Set later, a second tap
+    // arriving while this call is suspended at the permission prompt would sail
+    // past the guard and open a second picker — the guard would only be
+    // protecting the synchronous write, which cannot be re-entered anyway.
     setAdding(true);
     try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        // Spec §10: a date without photos is fully valid. Never a dead end.
+        Alert.alert('Photos unavailable', 'You can still title and publish this date.');
+        return;
+      }
+      const picked = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
+      const asset = picked.assets?.[0];
+      if (picked.canceled || !asset) return;
+
       // Copy to durable storage first: the picker's uri can be a temporary
       // cache entry the OS reclaims. A row pointing at a reclaimed file is a
       // permanently broken image with no way to notice it happened.
@@ -148,10 +152,12 @@ export default function Compose() {
 
           <Pressable
             onPress={addPhoto}
+            disabled={adding}
             style={{
               width: 84, height: 105, borderRadius: theme.radius.md,
               borderWidth: 1, borderColor: theme.color.line, borderStyle: 'dashed',
               alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.blush,
+              opacity: adding ? 0.4 : 1,
             }}
           >
             <Text style={{ fontSize: 24, color: theme.color.muted }}>+</Text>
