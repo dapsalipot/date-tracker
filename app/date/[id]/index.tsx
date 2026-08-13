@@ -88,10 +88,15 @@ export default function DateDetail() {
             <Pressable onPress={() => router.push(`/date/${id}/stop/${item.id}`)} style={{ flex: 1 }}>
               <View>
                 <Text style={{ color: theme.color.ink }}>{item.label ?? item.kind}</Text>
-                {item.placeName !== null && (
+                {/*
+                  Either field alone is enough to show this line. Gating on
+                  placeName hid the subkind entirely for the common case:
+                  place is free text you have to type, subkind is one tap, so
+                  tapping "cafe" and saving looked like nothing happened.
+                */}
+                {(item.placeName !== null || item.subkind !== null) && (
                   <Text style={{ color: theme.color.muted, fontSize: 12, marginTop: 2 }}>
-                    {item.placeName}
-                    {item.subkind !== null ? ` · ${item.subkind}` : ''}
+                    {[item.placeName, item.subkind].filter((part) => part !== null).join(' · ')}
                   </Text>
                 )}
               </View>
