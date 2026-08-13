@@ -100,4 +100,28 @@ describe('setCoverPhoto', () => {
     expect(updatedAtOf()).toBe(1_785_999_999_999);
     expect(updatedAtOf()).not.toBe(before);
   });
+
+  it("does not touch another date's cover when setting this one's", () => {
+    const { db, ctx, dateId } = setup();
+    const photoId = attachPhoto(db, DEPS, {
+      dateId, localUri: 'file:///a.jpg', width: 4, height: 3,
+    });
+
+    // A second date, on a different day, with its own independent cover.
+    const otherDay = testDeps(1_785_100_000_000, '2026-08-04', 'other2');
+    const other = captureStop(db, otherDay, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'gift', amountMinor: 100, currencyCode: 'PHP',
+    });
+    const otherPhotoId = attachPhoto(db, otherDay, {
+      dateId: other.dateId, localUri: 'file:///other.jpg', width: 4, height: 3,
+    });
+    db.update(dates).set({ coverPhotoId: otherPhotoId }).where(eq(dates.id, other.dateId)).run();
+
+    setCoverPhoto(db, DEPS, dateId, photoId);
+
+    // Unscoped, the UPDATE would stamp photoId onto every date row, including
+    // this unrelated one.
+    expect(coverOf(db, other.dateId)).toBe(otherPhotoId);
+  });
 });

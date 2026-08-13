@@ -85,4 +85,54 @@ describe('detachPhoto', () => {
       .where(eq(dates.id, dateId)).all()[0]?.coverPhotoId;
     expect(cover).toBeNull();
   });
+
+  it("does not clear another date's cover when detaching this one's", () => {
+    const db = createTestDb();
+    const ctx = ensureLocalContext(db, DEPS);
+
+    const dateA = captureStop(db, DEPS, {
+      coupleId: ctx.coupleId, userId: ctx.userId, kind: 'food', amountMinor: 1000, currencyCode: 'PHP',
+    });
+    const photoA = attachPhoto(db, DEPS, {
+      dateId: dateA.dateId, localUri: 'file:///a.jpg', width: 1, height: 1,
+    });
+    db.update(dates).set({ coverPhotoId: photoA }).where(eq(dates.id, dateA.dateId)).run();
+
+    // A second date, on a different day, with its own independent cover.
+    const otherDay = testDeps(1_785_100_000_000, '2026-08-04', 'other');
+    const dateB = captureStop(db, otherDay, {
+      coupleId: ctx.coupleId, userId: ctx.userId, kind: 'gift', amountMinor: 2000, currencyCode: 'PHP',
+    });
+    const photoB = attachPhoto(db, otherDay, {
+      dateId: dateB.dateId, localUri: 'file:///b.jpg', width: 1, height: 1,
+    });
+    db.update(dates).set({ coverPhotoId: photoB }).where(eq(dates.id, dateB.dateId)).run();
+
+    detachPhoto(db, DEPS, photoA);
+
+    const coverOf = (dateId: string) =>
+      db.select({ coverPhotoId: dates.coverPhotoId }).from(dates)
+        .where(eq(dates.id, dateId)).all()[0]?.coverPhotoId;
+
+    expect(coverOf(dateA.dateId)).toBeNull();
+    // Unscoped, the UPDATE would clear every date's cover, not just the one
+    // that pointed at the detached photo.
+    expect(coverOf(dateB.dateId)).toBe(photoB);
+  });
+
+  it('bumps the date so the feed sees the cover clear', () => {
+    const { db, dateId } = setup();
+    const id = attachPhoto(db, DEPS, { dateId, localUri: 'file:///a.jpg', width: 1, height: 1 });
+    db.update(dates).set({ coverPhotoId: id }).where(eq(dates.id, dateId)).run();
+    const dateUpdatedAt = () =>
+      db.select({ updatedAt: dates.updatedAt }).from(dates)
+        .where(eq(dates.id, dateId)).all()[0]?.updatedAt;
+    const before = dateUpdatedAt();
+
+    const later = testDeps(1_785_999_999_999, '2026-08-03', 'later');
+    detachPhoto(db, later, id);
+
+    expect(dateUpdatedAt()).toBe(1_785_999_999_999);
+    expect(dateUpdatedAt()).not.toBe(before);
+  });
 });

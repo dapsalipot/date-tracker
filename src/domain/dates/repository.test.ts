@@ -347,4 +347,30 @@ describe('listFeedDates', () => {
     expect(feed).toHaveLength(1);
     expect(feed[0]?.coverUri).toBeNull();
   });
+
+  it('does not let the cover join inflate the stop count or total', () => {
+    const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+
+    const captured = captureStop(db, AUG_3, {
+      coupleId, userId, kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
+    });
+    // A second, non-cover photo on the same date. Dates accumulate photos as
+    // captures happen, so a date with one cover photo set almost always has
+    // others lying around too. If the join matched on dateId instead of the
+    // photo's own id, this second photo would multiply the stop rows.
+    captureStop(db, AUG_3, {
+      coupleId, userId, kind: 'transport', amountMinor: 8000, currencyCode: 'PHP',
+      photo: { localUri: 'file:///candid.jpg', width: 4, height: 3 },
+    });
+    const photoId = attachPhoto(db, AUG_3, {
+      dateId: captured.dateId, localUri: 'file:///cover.jpg', width: 4, height: 3,
+    });
+    db.update(dates).set({ coverPhotoId: photoId }).where(eq(dates.id, captured.dateId)).run();
+
+    const feed = listFeedDates(db, scope);
+
+    expect(feed[0]?.stopCount).toBe(2);
+    expect(feed[0]?.totalMinor).toBe(50000);
+  });
 });
