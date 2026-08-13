@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { stops } from '@/db/schema';
+import { couples, dates, stops } from '@/db/schema';
 import { createTestDb, testDeps } from '@/test/testDb';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop } from '@/domain/dates/repository';
@@ -113,6 +113,48 @@ describe('buildTierTable', () => {
     // ₱100 and ¥10000 are both 10000 minor units. Mixing them is meaningless.
     expect(table.has('food')).toBe(false);
   });
+
+  it("ignores another couple's spending", () => {
+    const { db, scope, ctx } = setup();
+    // A second couple with plenty of food history. Their amounts must not
+    // shape this couple's tiers — a receipt is scoped to one couple's own
+    // sense of what expensive means.
+    db.insert(couples).values({
+      id: 'other-couple', currencyCode: 'PHP', timezone: 'Asia/Manila',
+      createdAt: 1, updatedAt: 1,
+    }).run();
+    for (let i = 0; i < 8; i += 1) {
+      const dateId = `other-date-${i}`;
+      db.insert(dates).values({
+        id: dateId, coupleId: 'other-couple', occurredOn: `2026-07-0${i + 1}`,
+        status: 'published', createdBy: ctx.userId, updatedAt: 1,
+      }).run();
+      db.insert(stops).values({
+        id: `other-stop-${i}`, dateId, sortOrder: 0, kind: 'food',
+        amountMinor: (i + 1) * 10000, currencyCode: 'PHP', updatedAt: 1,
+      }).run();
+    }
+
+    const table = buildTierTable(db, scope, TODAY);
+
+    expect(table.has('food')).toBe(false);
+  });
+
+  it('excludes stops belonging to a tombstoned date', () => {
+    const { db, scope, ctx } = setup();
+    const captured = [];
+    for (let i = 0; i < 6; i += 1) {
+      captured.push(capture(db, ctx, 'food', 10000, `2026-07-0${i + 1}`, `f${i}`));
+    }
+    // Tombstoning the DATE must remove its stops from the sample too. The
+    // stops themselves are still live, so only the join's ON-clause check
+    // catches this.
+    db.update(dates).set({ deletedAt: 1 }).where(eq(dates.id, captured[0]!.dateId)).run();
+
+    const table = buildTierTable(db, scope, TODAY);
+
+    expect(table.has('food')).toBe(false);
+  });
 });
 
 describe('tierFor', () => {
@@ -137,5 +179,12 @@ describe('tierSymbol', () => {
     expect(tierSymbol(2, 'PHP')).toBe('₱₱');
     expect(tierSymbol(3, 'PHP')).toBe('₱₱₱');
     expect(tierSymbol(3, 'JPY')).toBe('¥¥¥');
+  });
+
+  it('keeps a glyphless currency legible', () => {
+    // currencySymbol falls back to "GBP " for a currency with no glyph.
+    // Trimming before repeating would render tier 3 as "GBPGBPGBP".
+    expect(tierSymbol(1, 'GBP')).toBe('GBP');
+    expect(tierSymbol(3, 'GBP')).toBe('GBP GBP GBP');
   });
 });

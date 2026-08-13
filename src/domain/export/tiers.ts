@@ -84,6 +84,12 @@ export function tierFor(table: TierTable, kind: string, amountMinor: number): Ti
   return 3;
 }
 
+/**
+ * Repeat first, then trim. `currencySymbol` falls back to `"CODE "` for a
+ * currency with no glyph, so trimming first collapses three tiers into
+ * "GBPGBPGBP"; repeating first gives the legible "GBP GBP GBP", and the
+ * trailing trim keeps single-glyph currencies like ₱ unaffected.
+ */
 export function tierSymbol(tier: Tier, currencyCode: string): string {
-  return currencySymbol(currencyCode).trim().repeat(tier);
+  return currencySymbol(currencyCode).repeat(tier).trim();
 }
