@@ -135,4 +135,17 @@ describe('buildReceiptViewModel', () => {
     expect(vm.stopCount).toBe(1);
     expect(vm.total).toBe('₱420.00');
   });
+
+  it('excludes tombstoned stops from the per-person subtotals too', () => {
+    const { db, scope, dateId, rideStop } = setup();
+    deleteStop(db, DEPS, rideStop);
+
+    const vm = buildReceiptViewModel(db, scope, dateId, 'exact', TODAY)!;
+
+    // `people` comes from its own query, with its own tombstone filter. If
+    // that filter goes, the receipt shows a grand total of ₱420 sitting above
+    // a "paid by" line reading ₱500 — the same image contradicting itself.
+    expect(vm.people[0]?.money).toBe('₱420.00');
+    expect(vm.people[0]?.money).toBe(vm.total);
+  });
 });

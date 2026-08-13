@@ -92,15 +92,24 @@ export function buildReceiptViewModel(
     )
     .all();
 
-  const byPerson = new Map<string, number>();
+  // Keyed by user id, not display name: two partners who happen to share a
+  // name would otherwise collapse into one row with their spending summed.
+  // v1 has a single user so this cannot bite yet, but this map is exactly the
+  // thing v2 grows a second row into.
+  const byPerson = new Map<string, { name: string; amountMinor: number }>();
   for (const row of paid) {
-    const name = row.name ?? 'Someone';
-    byPerson.set(name, (byPerson.get(name) ?? 0) + row.amountMinor);
+    const key = row.userId ?? '__unattributed__';
+    const existing = byPerson.get(key);
+    if (existing === undefined) {
+      byPerson.set(key, { name: row.name ?? 'Someone', amountMinor: row.amountMinor });
+    } else {
+      existing.amountMinor += row.amountMinor;
+    }
   }
 
-  const people: ReceiptPerson[] = [...byPerson].map(([name, amountMinor]) => ({
-    name,
-    money: showTotals ? formatMoney(money(amountMinor, scope.currencyCode)) : null,
+  const people: ReceiptPerson[] = [...byPerson.values()].map((person) => ({
+    name: person.name,
+    money: showTotals ? formatMoney(money(person.amountMinor, scope.currencyCode)) : null,
   }));
 
   return {
