@@ -127,12 +127,27 @@ export default function DateDetail() {
         )}
       />
 
-      <Pressable
-        onPress={() => router.push(`/date/${id}/compose`)}
-        style={{ margin: theme.space.md, alignItems: 'center', paddingVertical: theme.space.md, borderRadius: theme.radius.md, backgroundColor: theme.color.ink }}
-      >
-        <Text style={{ color: theme.color.cream, fontWeight: '700' }}>Edit</Text>
-      </Pressable>
+      <View style={{ flexDirection: 'row', gap: theme.space.sm, margin: theme.space.md }}>
+        <Pressable
+          onPress={() => router.push(`/date/${id}/compose`)}
+          style={{ flex: 1, alignItems: 'center', paddingVertical: theme.space.md, borderRadius: theme.radius.md, backgroundColor: theme.color.ink }}
+        >
+          <Text style={{ color: theme.color.cream, fontWeight: '700' }}>Edit</Text>
+        </Pressable>
+
+        {/*
+          A draft has no story yet — offering to post it is offering to post
+          "Untitled date". Share only appears once the date is published.
+        */}
+        {detail.status === 'published' && (
+          <Pressable
+            onPress={() => router.push(`/date/${id}/share`)}
+            style={{ flex: 1, alignItems: 'center', paddingVertical: theme.space.md, borderRadius: theme.radius.md, backgroundColor: theme.color.blush }}
+          >
+            <Text style={{ color: theme.color.ink, fontWeight: '700' }}>Share</Text>
+          </Pressable>
+        )}
+      </View>
     </SafeAreaView>
   );
 }

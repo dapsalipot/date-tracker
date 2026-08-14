@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { Fill, Group, Line, Text as SkText, matchFont } from '@shopify/react-native-skia';
+import { Canvas, Fill, Group, Line, Text as SkText, matchFont } from '@shopify/react-native-skia';
 import type { ReceiptViewModel } from '@/domain/export/receipt';
 import { theme } from '@/ui/theme';
 
@@ -184,5 +184,25 @@ export function ReceiptTemplate({ vm, size }: { vm: ReceiptViewModel; size: Rece
     <Group clip={{ x: 0, y: 0, width, height }}>
       {children}
     </Group>
+  );
+}
+
+/**
+ * Mounts `ReceiptTemplate` inside a live Skia `<Canvas>` at its true pixel
+ * size, so the share screen's preview is the exact component tree
+ * `export.ts` rasterizes — not a separate RN mock that could drift from it
+ * (spec §7.4: "a separate component tree ... not a screenshot"). This keeps
+ * Skia awareness inside this file, honouring boundary rule 3 (spec §6):
+ * everything outside `src/render/receipt/` asks for a shareable image and
+ * never learns Skia was involved. Callers that need to fit this on a phone
+ * screen scale the returned view down with a CSS transform; this component
+ * itself always renders at `RECEIPT_SIZES[size]`.
+ */
+export function ReceiptCanvas({ vm, size }: { vm: ReceiptViewModel; size: ReceiptSize }): ReactElement {
+  const { width, height } = RECEIPT_SIZES[size];
+  return (
+    <Canvas style={{ width, height }}>
+      <ReceiptTemplate vm={vm} size={size} />
+    </Canvas>
   );
 }
