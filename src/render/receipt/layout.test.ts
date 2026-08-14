@@ -52,7 +52,6 @@ function makeVm(stopCount: number, overrides: Record<string, unknown> = {}) {
     total: '₱2,340.00',
     rating: 5,
     stopCount,
-    moneyMode: 'exact' as const,
     ...overrides,
   } as Parameters<typeof ReceiptTemplate>[0]['vm'];
 }

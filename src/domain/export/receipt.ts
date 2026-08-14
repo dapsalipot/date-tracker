@@ -28,7 +28,6 @@ export interface ReceiptViewModel {
   readonly total: string | null;
   readonly rating: number | null;
   readonly stopCount: number;
-  readonly moneyMode: MoneyMode;
 }
 
 /**
@@ -136,6 +135,5 @@ export function buildReceiptViewModel(
     total: showTotals ? formatMoney(money(totalMinor, scope.currencyCode)) : null,
     rating: detail.rating,
     stopCount: rows.length,
-    moneyMode,
   };
 }

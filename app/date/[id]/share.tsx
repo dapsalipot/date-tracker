@@ -107,6 +107,10 @@ export default function Share() {
           </View>
         </View>
 
+        <Text style={{ color: theme.color.muted, textAlign: 'center' }}>
+          {vm.stopCount === 1 ? '1 stop' : `${vm.stopCount} stops`} · {vm.occurredOn}
+        </Text>
+
         <Text style={{ fontSize: 11, letterSpacing: 1, color: theme.color.muted }}>MONEY</Text>
         <View style={{ flexDirection: 'row', gap: theme.space.sm }}>
           {MODES.map((option) => {
