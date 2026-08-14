@@ -59,7 +59,16 @@ export async function shareReceipt(vm: ReceiptViewModel, size: ReceiptSize): Pro
     throw new Error('Failed to render the receipt image.');
   }
 
-  const bytes = image.encodeToBytes(ImageFormat.PNG);
+  let bytes: Uint8Array;
+  try {
+    bytes = image.encodeToBytes(ImageFormat.PNG);
+  } finally {
+    // A 1080x1920 surface is a native allocation the JS GC does not hurry to
+    // reclaim. Spec §10 names low-memory Skia export as a real failure mode,
+    // and holding several of these across repeated exports is how you get
+    // there. Released as soon as the bytes are out.
+    image.dispose();
+  }
 
   // Cache, not documents: this is a derived artifact and the OS reclaiming
   // it costs nothing. A stable, human-meaningful name — the title slugified
@@ -70,7 +79,19 @@ export async function shareReceipt(vm: ReceiptViewModel, size: ReceiptSize): Pro
   // (their async counterparts are copy()/move(), not these). Overwrite
   // rather than fail or accumulate `-1`, `-2` copies from earlier shares.
   file.create({ overwrite: true });
-  file.write(bytes);
+  try {
+    file.write(bytes);
+  } catch (err) {
+    // create() truncates before write(), so a failure here (spec §10: device
+    // storage full) would otherwise leave a 0-byte PNG in cache for the share
+    // sheet — or a later run — to pick up.
+    try {
+      file.delete();
+    } catch {
+      // Nothing more to do; the original failure is the one worth reporting.
+    }
+    throw err;
+  }
 
   await Sharing.shareAsync(file.uri, { mimeType: 'image/png', UTI: 'public.png' });
 }

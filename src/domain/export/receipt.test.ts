@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createTestDb, testDeps } from '@/test/testDb';
-import { dates } from '@/db/schema';
+import { couples, dates, stops, users } from '@/db/schema';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop } from '@/domain/dates/repository';
 import { deleteStop, updateStop } from '@/domain/stops/edit';
@@ -32,6 +32,68 @@ describe('buildReceiptViewModel', () => {
   it('returns null for a date that does not exist', () => {
     const { db, scope } = setup();
     expect(buildReceiptViewModel(db, scope, 'nope', 'exact', TODAY)).toBeNull();
+  });
+
+  it("refuses to build a receipt for another couple's date", () => {
+    const { db, scope, ctx } = setup();
+    db.insert(couples).values({
+      id: 'them', currencyCode: 'PHP', timezone: 'Asia/Manila', createdAt: 1, updatedAt: 1,
+    }).run();
+    db.insert(dates).values({
+      id: 'their-date', coupleId: 'them', occurredOn: '2026-08-10', status: 'published',
+      title: 'Their anniversary', createdBy: ctx.userId, updatedAt: 1,
+    }).run();
+    db.insert(stops).values({
+      id: 'their-stop', dateId: 'their-date', sortOrder: 0, kind: 'food',
+      label: 'Their dinner', amountMinor: 999900, currencyCode: 'PHP', updatedAt: 1,
+    }).run();
+
+    // Every read besides the tier table filtered on dateId alone, so passing a
+    // foreign id returned that couple's evening — title, line items and total.
+    // Dormant with one local couple, but this is exactly the cross-tenant read
+    // v2 pairing would expose.
+    expect(buildReceiptViewModel(db, scope, 'their-date', 'exact', TODAY)).toBeNull();
+  });
+
+  it('returns null for a tombstoned date', () => {
+    const { db, scope, dateId } = setup();
+    db.update(dates).set({ deletedAt: 1 }).where(eq(dates.id, dateId)).run();
+
+    expect(buildReceiptViewModel(db, scope, dateId, 'exact', TODAY)).toBeNull();
+  });
+
+  it('excludes a stop in another currency from lines and totals', () => {
+    const { db, scope, ctx, dateId } = setup();
+    db.insert(stops).values({
+      id: 'yen-stop', dateId, sortOrder: 9, kind: 'shopping',
+      label: 'Tokyo souvenir', amountMinor: 500000, currencyCode: 'JPY',
+      paidByUserId: ctx.userId, updatedAt: 1,
+    }).run();
+
+    const vm = buildReceiptViewModel(db, scope, dateId, 'exact', TODAY)!;
+
+    // ₱100 and ¥10000 are both 10000 minor units, so summing across currencies
+    // is meaningless — the total must stay the PHP one.
+    expect(vm.lines.map((l) => l.label)).not.toContain('Tokyo souvenir');
+    expect(vm.stopCount).toBe(2);
+    expect(vm.total).toBe('₱500.00');
+    expect(vm.people[0]?.money).toBe('₱500.00');
+  });
+
+  it('keeps two people with the same name apart', () => {
+    const { db, scope, ctx, dateId, rideStop } = setup();
+    db.insert(users).values({
+      id: 'twin', displayName: 'Alex', updatedAt: 1,
+    }).run();
+    db.update(users).set({ displayName: 'Alex' }).where(eq(users.id, ctx.userId)).run();
+    db.update(stops).set({ paidByUserId: 'twin' }).where(eq(stops.id, rideStop)).run();
+
+    const vm = buildReceiptViewModel(db, scope, dateId, 'exact', TODAY)!;
+
+    // Keyed by display name, these two would merge into one ₱500 row and the
+    // receipt would claim one person paid for everything.
+    expect(vm.people).toHaveLength(2);
+    expect(vm.people.map((p) => p.money).sort()).toEqual(['₱420.00', '₱80.00']);
   });
 
   it('lists stops in timeline order with their labels', () => {

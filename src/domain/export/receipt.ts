@@ -1,5 +1,5 @@
 import { and, eq, isNull } from 'drizzle-orm';
-import { stops, users } from '@/db/schema';
+import { dates, stops, users } from '@/db/schema';
 import type { AppDatabase } from '@/db/types';
 import type { CoupleScope } from '@/domain/scope';
 import { loadDateDetail } from '@/domain/dates/compose';
@@ -46,6 +46,18 @@ export function buildReceiptViewModel(
   moneyMode: MoneyMode,
   todayLocal: string,
 ): ReceiptViewModel | null {
+  // Ownership first. Every read below filters on dateId alone, so without this
+  // gate a foreign id would return another couple's evening — title, line items
+  // and total. There is one local couple in v1, but this is exactly the
+  // cross-tenant read v2 pairing exposes, and `tiers.ts` already scopes by
+  // couple, so leaving this open would be an inconsistency waiting to be found.
+  const owned = db
+    .select({ id: dates.id })
+    .from(dates)
+    .where(and(eq(dates.id, dateId), eq(dates.coupleId, scope.coupleId), isNull(dates.deletedAt)))
+    .all();
+  if (owned.length === 0) return null;
+
   const detail = loadDateDetail(db, dateId);
   if (detail === null) return null;
 
@@ -58,7 +70,11 @@ export function buildReceiptViewModel(
   const lineMoney = (kind: string, amountMinor: number): string | null => {
     if (moneyMode === 'hidden') return null;
     if (moneyMode === 'exact') return formatMoney(money(amountMinor, scope.currencyCode));
-    const tier = tierFor(tiers!, kind, amountMinor);
+    // Fail closed rather than assert non-null: if the table were ever missing,
+    // a `!` here would mark every line ₱ — quietly claiming "this was cheap"
+    // about spending we have no basis to judge. Showing nothing is honest.
+    if (tiers === null) return null;
+    const tier = tierFor(tiers, kind, amountMinor);
     // A kind below the sample floor falls back to hidden for that line only.
     return tier === null ? null : tierSymbol(tier, scope.currencyCode);
   };
