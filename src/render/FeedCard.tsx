@@ -5,6 +5,9 @@ import { theme } from '@/ui/theme';
 
 const COVER_ASPECT_RATIO = 4 / 5;
 
+/** Height of the tinted band shown when a date has no cover photo. */
+const NO_COVER_BAND_HEIGHT = 72;
+
 /**
  * Most dates will never have a photo, so the no-cover case is the default
  * appearance rather than a degraded one. A flat tint keyed off the date's id
@@ -59,16 +62,21 @@ export function FeedCard({ date, onPress }: Props) {
           resizeMode="cover"
         />
       ) : (
+        // No photo: a slim tinted band, not a photo-sized hole. Reserving the
+        // full 4:5 block for a single letter meant one date filled the screen,
+        // and since most dates never get a photo that was the normal case —
+        // the feed became unscannable. The band still gives each card its own
+        // colour so it stays recognisable on return.
         <View
           style={{
             width: '100%',
-            aspectRatio: COVER_ASPECT_RATIO,
+            height: NO_COVER_BAND_HEIGHT,
             backgroundColor: tintFor(date.id),
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Text style={{ fontSize: 40, fontWeight: '800', color: theme.color.muted }}>
+          <Text style={{ fontSize: 28, fontWeight: '800', color: theme.color.muted }}>
             {initialOf(date.title)}
           </Text>
         </View>
