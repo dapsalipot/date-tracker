@@ -111,16 +111,15 @@ export default function StopEditor() {
           {stop.kind.toUpperCase()}
         </Text>
 
-        <Text style={{ color: theme.color.muted }}>
-          {current.amount === AMOUNT_UNCHANGED
-            ? `Now ${formatMoney(money(stop.amountMinor, stop.currencyCode))} — type to change it`
-            : 'New amount'}
+        <Text style={{ color: theme.color.muted, textAlign: 'center' }}>
+          {current.amount === AMOUNT_UNCHANGED ? 'Type to change the amount' : 'New amount'}
         </Text>
 
         <AmountKeypad
           value={current.amount}
           onChange={(amount) => patch({ amount })}
           currencyCode={stop.currencyCode}
+          placeholder={formatMoney(money(stop.amountMinor, stop.currencyCode))}
         />
 
         <SubkindChips

@@ -17,6 +17,12 @@ interface Props {
   value: string;
   onChange: (next: string) => void;
   currencyCode: string;
+  /**
+   * Shown, muted, while `value` is empty. The stop editor starts empty to mean
+   * "leave the amount alone", and without this the biggest thing on screen read
+   * ₱0 for a ₱420 stop — which looks like the amount was wiped.
+   */
+  placeholder?: string;
 }
 
 /**
@@ -25,7 +31,7 @@ interface Props {
  * non-numeric layout. The capture target is five seconds, and a keypad that is
  * simply already on screen removes that whole class of delay.
  */
-export function AmountKeypad({ value, onChange, currencyCode }: Props) {
+export function AmountKeypad({ value, onChange, currencyCode, placeholder }: Props) {
   // money.ts owns both facts (MINOR_EXPONENTS, SYMBOLS). Reading them here
   // instead of hardcoding "two decimals" and a PHP-only symbol is what stops
   // the keypad from accepting precision (e.g. "420.50" for JPY) that
@@ -59,8 +65,16 @@ export function AmountKeypad({ value, onChange, currencyCode }: Props) {
 
   return (
     <View>
-      <Text style={{ fontSize: 44, fontWeight: '800', color: theme.color.ink, textAlign: 'center', paddingVertical: theme.space.md }}>
-        {symbol}{value === '' ? '0' : value}
+      <Text
+        style={{
+          fontSize: 44,
+          fontWeight: '800',
+          textAlign: 'center',
+          paddingVertical: theme.space.md,
+          color: value === '' && placeholder !== undefined ? theme.color.muted : theme.color.ink,
+        }}
+      >
+        {value === '' && placeholder !== undefined ? placeholder : `${symbol}${value === '' ? '0' : value}`}
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         {keys.map((key) => (
