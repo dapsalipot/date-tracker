@@ -80,6 +80,39 @@ function rightAlignedText(
   return <SkText key={key} x={rightEdge - width} y={y} text={text} font={font} color={color} />;
 }
 
+const TITLE_MIN_SIZE = 40;
+const TITLE_SHRINK_STEP = 4;
+
+/**
+ * Shrinks a title until it fits, then ellipsises if it still does not. The
+ * compose screen caps title length, but a wide title at 72px can still overrun
+ * 920px of usable width — and an un-measured SkText simply runs off the canvas
+ * edge with no warning, taking the rest of the word with it.
+ */
+function fitTitle(text: string, maxWidth: number): { text: string; font: ReturnType<typeof skiaFont> } {
+  let size = TITLE_SIZE;
+  let font = skiaFont(size, 'bold');
+  while (size > TITLE_MIN_SIZE && font.measureText(text).width > maxWidth) {
+    size -= TITLE_SHRINK_STEP;
+    font = skiaFont(size, 'bold');
+  }
+  if (font.measureText(text).width <= maxWidth) return { text, font };
+
+  // Slice by code point, not code unit — cutting a surrogate pair in half
+  // renders as tofu, and emoji in titles are expected here.
+  const points = Array.from(text);
+  let kept = points.length;
+  while (kept > 1 && font.measureText(`${points.slice(0, kept).join('')}…`).width > maxWidth) {
+    kept -= 1;
+  }
+  return { text: `${points.slice(0, kept).join('')}…`, font };
+}
+
+/** Vertical advance a line row consumes, which depends on whether it has a detail line. */
+function rowHeightOf(hasDetail: boolean): number {
+  return hasDetail ? DETAIL_OFFSET + AFTER_DETAIL_GAP : LINE_ROW_GAP;
+}
+
 /**
  * Renders `vm` — every string this shows comes from `ReceiptViewModel`. The
  * template never formats a number, builds a currency string, or sums
@@ -106,7 +139,8 @@ export function ReceiptTemplate({ vm, size }: { vm: ReceiptViewModel; size: Rece
   ];
 
   let y = PADDING + TITLE_SIZE * 0.85;
-  children.push(<SkText key="title" x={left} y={y} text={vm.title} font={fonts.title} color={theme.color.ink} />);
+  const title = fitTitle(vm.title, right - left);
+  children.push(<SkText key="title" x={left} y={y} text={title.text} font={title.font} color={theme.color.ink} />);
 
   y += DATE_SIZE + 44;
   children.push(<SkText key="date" x={left} y={y} text={vm.occurredOn} font={fonts.date} color={theme.color.muted} />);
@@ -115,7 +149,39 @@ export function ReceiptTemplate({ vm, size }: { vm: ReceiptViewModel; size: Rece
   children.push(divider('divider-lines', y, left, right));
   y += SECTION_GAP;
 
-  vm.lines.forEach((line, i) => {
+  // A solo "paid by" line with no amount is noise, not information — skip it.
+  const showPeople = vm.people.length > 0 && !(vm.people.length === 1 && vm.people.every((p) => p.money === null));
+  const showTotal = vm.total !== null;
+  const showRating = vm.rating !== null;
+  const hasFooter = showPeople || showTotal || showRating;
+
+  // Reserve the footer's height BEFORE laying out lines. Without this the rows
+  // simply kept accumulating and the root Group clipped whatever fell past the
+  // bottom edge — so a long date silently exported a receipt with no total on
+  // it, which is precisely the number the reader is looking for.
+  let footerHeight = hasFooter ? SECTION_GAP : 0; // the divider above it
+  if (showPeople) footerHeight += CAPTION_GAP + vm.people.length * PERSON_ROW_GAP + (SECTION_GAP - PERSON_ROW_GAP);
+  if (showTotal) footerHeight += SECTION_GAP + TOTAL_SIZE * 0.4;
+  if (showRating) footerHeight += HEART_SIZE;
+
+  const linesBottom = height - PADDING - footerHeight;
+
+  // How many rows fit, leaving room for a "+N more" row if we have to truncate.
+  let fitCount = 0;
+  let used = 0;
+  for (const line of vm.lines) {
+    const next = used + rowHeightOf(line.detail !== null);
+    const isLast = fitCount === vm.lines.length - 1;
+    const reserve = isLast ? 0 : LINE_ROW_GAP; // room for the overflow row
+    if (y + next + reserve > linesBottom) break;
+    used = next;
+    fitCount += 1;
+  }
+
+  const shown = vm.lines.slice(0, fitCount);
+  const hiddenCount = vm.lines.length - fitCount;
+
+  shown.forEach((line, i) => {
     children.push(
       <SkText key={`label-${i}`} x={left} y={y} text={line.label} font={fonts.label} color={theme.color.ink} />,
     );
@@ -133,11 +199,28 @@ export function ReceiptTemplate({ vm, size }: { vm: ReceiptViewModel; size: Rece
     }
   });
 
-  // A solo "paid by" line with no amount is noise, not information — skip it.
-  const showPeople = vm.people.length > 0 && !(vm.people.length === 1 && vm.people.every((p) => p.money === null));
+  if (hiddenCount > 0) {
+    // Say so rather than just stopping. A receipt that quietly omits stops is
+    // worse than one that admits it ran out of room.
+    children.push(
+      <SkText
+        key="overflow"
+        x={left}
+        y={y}
+        text={hiddenCount === 1 ? '+1 more stop' : `+${hiddenCount} more stops`}
+        font={fonts.detail}
+        color={theme.color.muted}
+      />,
+    );
+    y += LINE_ROW_GAP;
+  }
 
-  children.push(divider('divider-people', y, left, right));
-  y += SECTION_GAP;
+  // Only draw the closing rule when something follows it, otherwise tier and
+  // hidden mode with a solo payer leave a rule hanging under nothing.
+  if (hasFooter) {
+    children.push(divider('divider-people', y, left, right));
+    y += SECTION_GAP;
+  }
 
   if (showPeople) {
     children.push(

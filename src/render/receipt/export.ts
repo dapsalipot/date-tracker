@@ -17,6 +17,7 @@ import { RECEIPT_SIZES, ReceiptTemplate, type ReceiptSize } from './ReceiptTempl
  * Falls back to a stable placeholder when the title has no alphanumerics
  * left after stripping (all-emoji titles, pure punctuation, empty string).
  */
+const SLUG_MAX_LENGTH = 60;
 const COMBINING_DIACRITIC_START = 0x0300;
 const COMBINING_DIACRITIC_END = 0x036f;
 
@@ -31,7 +32,11 @@ function slugify(value: string): string {
   const slug = withoutDiacritics
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^-+|-+$/g, '')
+    // A filename component must stay under 255 bytes or create() throws, and
+    // the failure would surface only as the share screen's generic alert.
+    .slice(0, SLUG_MAX_LENGTH)
+    .replace(/-+$/, '');
   return slug.length > 0 ? slug : 'date';
 }
 

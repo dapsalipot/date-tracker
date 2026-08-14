@@ -101,6 +101,10 @@ export default function Compose() {
           onChangeText={setTitle}
           placeholder="Name this date"
           placeholderTextColor={theme.color.muted}
+          // The receipt shrinks and then ellipsises an over-wide title, and
+          // the exported filename is built from it. Cap it here so neither has
+          // to rescue an essay.
+          maxLength={60}
           style={{ fontSize: 24, fontWeight: '700', color: theme.color.ink, paddingVertical: theme.space.sm }}
         />
 
