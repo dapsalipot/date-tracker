@@ -136,25 +136,6 @@ export default function DateDetail() {
         </Pressable>
 
         {/*
-          Published only. A draft has no story yet, so offering to post it is
-          offering to post "Untitled date".
-        */}
-        <Pressable
-          onPress={() => router.push(`/date/${id}/share`)}
-          disabled={detail.status !== 'published'}
-          style={{
-            flex: 1,
-            alignItems: 'center',
-            paddingVertical: theme.space.md,
-            borderRadius: theme.radius.md,
-            backgroundColor: theme.color.blush,
-            opacity: detail.status === 'published' ? 1 : 0.35,
-          }}
-        >
-          <Text style={{ color: theme.color.ink, fontWeight: '700' }}>Share</Text>
-        </Pressable>
-
-        {/*
           A draft has no story yet — offering to post it is offering to post
           "Untitled date". Share only appears once the date is published.
         */}

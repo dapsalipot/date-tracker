@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Dimensions, Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, SafeAreaView, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { useLocalSearchParams } from 'expo-router';
 import { db } from '@/db/client';
@@ -47,7 +47,8 @@ export default function Share() {
   );
 
   const target = RECEIPT_SIZES[size];
-  const previewWidth = Dimensions.get('window').width - PREVIEW_MARGIN;
+  const { width: windowWidth } = useWindowDimensions();
+  const previewWidth = windowWidth - PREVIEW_MARGIN;
   const scale = previewWidth / target.width;
 
   const share = async () => {
@@ -57,10 +58,18 @@ export default function Share() {
     setSharing(true);
     try {
       await shareReceipt(vm, size);
-    } catch {
-      // shareReceipt throws deliberately — it has no UI of its own, so the
-      // message belongs here.
-      Alert.alert('Could not share that', 'Something went wrong making the image.');
+    } catch (err) {
+      // shareReceipt throws deliberately and distinguishably — it has no UI of
+      // its own, so the message belongs here. Spec §10 wants a retry offered
+      // rather than a dead end.
+      const detail =
+        err instanceof Error && err.message.includes('not available')
+          ? 'Sharing is turned off on this device.'
+          : 'Something went wrong making the image.';
+      Alert.alert('Could not share that', detail, [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Try again', onPress: () => { void share(); } },
+      ]);
     } finally {
       setSharing(false);
     }

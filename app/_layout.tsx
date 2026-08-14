@@ -26,10 +26,27 @@ export default function RootLayout() {
     );
   }
 
+  // Headers are ON by default so every pushed screen gets a back button. The
+  // two screens that opt out both provide their own way back: the feed is the
+  // root (nowhere to go), and capture is a modal with an explicit Cancel.
+  // Without this, the only way out of a detail screen was the iOS edge-swipe —
+  // undiscoverable, and absent entirely on Android.
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="capture" options={{ presentation: 'modal' }} />
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: theme.color.cream },
+        headerTintColor: theme.color.ink,
+        headerTitleStyle: { fontWeight: '700' },
+        headerShadowVisible: false,
+        contentStyle: { backgroundColor: theme.color.cream },
+      }}
+    >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="capture" options={{ presentation: 'modal', headerShown: false }} />
+      <Stack.Screen name="date/[id]/index" options={{ title: 'Date' }} />
+      <Stack.Screen name="date/[id]/compose" options={{ title: 'Compose' }} />
+      <Stack.Screen name="date/[id]/share" options={{ title: 'Share' }} />
+      <Stack.Screen name="date/[id]/stop/[stopId]" options={{ title: 'Edit stop' }} />
     </Stack>
   );
 }
