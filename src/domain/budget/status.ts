@@ -45,18 +45,20 @@ export function setBudget(
 }
 
 /**
+ * Budget status for an arbitrary month. `todayLocal` is still needed because
+ * `daysLeft` is only meaningful for the month containing today; for any other
+ * month `daysRemainingIn` correctly returns 0.
+ *
  * Spend is attributed to the month of the parent date's `occurred_on`, not the
  * stop's own timestamp, so a date running past midnight counts entirely in one
  * month and "this date cost X" agrees between the receipt and the dashboard.
  */
-export function computeBudgetStatus(
+export function budgetStatusFor(
   db: AppDatabase,
   scope: CoupleScope,
-  deps: Deps,
+  periodMonth: string,
+  todayLocal: string,
 ): BudgetStatus {
-  const today = deps.clock.todayLocal();
-  const periodMonth = periodMonthFor(today);
-
   const spentRows = db
     .select({ total: sql<number>`coalesce(sum(${stops.amountMinor}), 0)` })
     .from(stops)
@@ -95,6 +97,11 @@ export function computeBudgetStatus(
     spentMinor,
     remainingMinor,
     isOverBudget: remainingMinor !== null && remainingMinor < 0,
-    daysLeft: daysRemainingIn(periodMonth, today),
+    daysLeft: daysRemainingIn(periodMonth, todayLocal),
   };
+}
+
+export function computeBudgetStatus(db: AppDatabase, scope: CoupleScope, deps: Deps): BudgetStatus {
+  const today = deps.clock.todayLocal();
+  return budgetStatusFor(db, scope, periodMonthFor(today), today);
 }

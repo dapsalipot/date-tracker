@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop } from '@/domain/dates/repository';
 import { stops } from '@/db/schema';
-import { computeBudgetStatus, setBudget } from './status';
+import { budgetStatusFor, computeBudgetStatus, setBudget } from './status';
 
 const AUG_30 = testDeps(1_787_000_000_000, '2026-08-30', 'aug30');
 const SEP_1 = testDeps(1_787_300_000_000, '2026-09-01', 'sep1');
@@ -110,5 +110,33 @@ describe('computeBudgetStatus', () => {
     captureStop(db, AUG_30, { coupleId, userId, kind: 'food', amountMinor: 500000, currencyCode: 'JPY' });
 
     expect(computeBudgetStatus(db, scope, AUG_30).spentMinor).toBe(234000);
+  });
+
+  it('reports a month other than the current one', () => {
+    const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+    // Spend in July while "today" is in August.
+    captureStop(db, testDeps(Date.parse('2026-07-10T12:00:00Z'), '2026-07-10', 'jul'), {
+      coupleId, userId,
+      kind: 'food', amountMinor: 30000, currencyCode: 'PHP',
+    });
+
+    const july = budgetStatusFor(db, scope, '2026-07', '2026-08-14');
+
+    expect(july.periodMonth).toBe('2026-07');
+    expect(july.spentMinor).toBe(30000);
+    // daysLeft is only meaningful for the month containing today.
+    expect(july.daysLeft).toBe(0);
+  });
+
+  it('does not count another month\'s spend', () => {
+    const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+    captureStop(db, testDeps(Date.parse('2026-07-10T12:00:00Z'), '2026-07-10', 'jul'), {
+      coupleId, userId,
+      kind: 'food', amountMinor: 30000, currencyCode: 'PHP',
+    });
+
+    expect(budgetStatusFor(db, scope, '2026-08', '2026-08-14').spentMinor).toBe(0);
   });
 });
