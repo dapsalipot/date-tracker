@@ -10,11 +10,22 @@ import { formatMoney, money } from '@/domain/money/money';
 import { FeedCard } from '@/render/FeedCard';
 import { seedTwelveMonths } from '@/fixtures/seed';
 import { getAppDeps, getLocalContext } from '@/session';
+import { Card } from '@/ui/Card';
 import { MicroLabel } from '@/ui/MicroLabel';
-import { Rule } from '@/ui/Rule';
 import { Screen } from '@/ui/Screen';
 import { theme } from '@/ui/theme';
 import { tap } from '@/ui/feedback';
+
+const MONTHS = [
+  'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
+  'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
+];
+
+/** "2026-08" -> "AUGUST 2026". Same slice-not-Date approach as FeedCard. */
+function monthLabel(periodMonth: string): string {
+  const monthIndex = Number.parseInt(periodMonth.slice(5, 7), 10) - 1;
+  return `${MONTHS[monthIndex] ?? ''} ${periodMonth.slice(0, 4)}`;
+}
 
 export default function Feed() {
   const ctx = getLocalContext();
@@ -44,70 +55,36 @@ export default function Feed() {
   return (
     <Screen>
       <View style={{ paddingTop: theme.space.sm }}>
-        <MicroLabel>OUR DATES</MicroLabel>
-        <Text
-          style={{
-            ...theme.type.meta,
-            color: budget.isOverBudget ? theme.role.accent : theme.role.inkMuted,
-            marginTop: theme.space.xs,
-          }}
-        >
+        <MicroLabel>{monthLabel(budget.periodMonth)}</MicroLabel>
+        <Text style={{ ...theme.type.display, color: theme.role.primary, marginTop: theme.space.xs }}>
           {remaining}
         </Text>
       </View>
 
       {drafts.length > 0 && (
-        <View style={{ marginTop: theme.space.md }}>
-          <Rule />
-          <Pressable
-            onPress={() => router.push(`/date/${drafts[0]?.id}/compose`)}
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingVertical: theme.space.sm,
-            }}
-          >
-            <MicroLabel>
-              {drafts.length === 1 ? '1 DATE WAITING' : `${drafts.length} DATES WAITING`}
-            </MicroLabel>
-            <Text style={{ ...theme.type.meta, color: theme.role.accent }}>Finish</Text>
-          </Pressable>
-          <Rule />
+        <View style={{ marginTop: theme.space.md, marginBottom: theme.space.md }}>
+          <Card onPress={() => router.push(`/date/${drafts[0]?.id}/compose`)}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <MicroLabel>
+                {drafts.length === 1 ? '1 DATE WAITING' : `${drafts.length} DATES WAITING`}
+              </MicroLabel>
+              <Text style={{ ...theme.type.meta, color: theme.role.primary }}>Finish</Text>
+            </View>
+          </Card>
         </View>
       )}
 
-      {/*
-        The Screen body carries paddingHorizontal: theme.screenMargin, which
-        would otherwise inset the FlatList and cap FeedCard's photo short of
-        the true edge. Cancelling it here with an equal negative margin lets
-        the list reach the screen edges again; FeedCard's own text block then
-        reapplies theme.screenMargin so its type lines up with the header
-        above, while its image has no such padding and bleeds full width.
-      */}
       <FlatList
         data={published}
         keyExtractor={(item) => item.id}
-        style={{ marginHorizontal: -theme.screenMargin }}
-        contentContainerStyle={{ paddingBottom: theme.space.xxl }}
-        ItemSeparatorComponent={Rule}
+        contentContainerStyle={{ paddingTop: theme.space.md, paddingBottom: theme.space.xxl, gap: theme.space.md }}
         ListEmptyComponent={
           drafts.length === 0 && published.length === 0 ? (
-            <Pressable
-              onPress={() => seedTwelveMonths(db, ctx.coupleId, ctx.userId, deps.clock.todayLocal(), deps)}
-              style={{
-                marginHorizontal: theme.screenMargin,
-                marginTop: theme.space.lg,
-                padding: theme.space.lg,
-                borderRadius: theme.radius.md,
-                backgroundColor: theme.role.accentQuiet,
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ ...theme.type.body, fontWeight: '600', color: theme.role.ink }}>
+            <Card onPress={() => seedTwelveMonths(db, ctx.coupleId, ctx.userId, deps.clock.todayLocal(), deps)}>
+              <Text style={{ ...theme.type.body, fontWeight: '600', color: theme.role.ink, textAlign: 'center' }}>
                 Seed 12 months of demo dates
               </Text>
-            </Pressable>
+            </Card>
           ) : null
         }
         renderItem={({ item }) => (
@@ -124,12 +101,12 @@ export default function Feed() {
           width: 60,
           height: 60,
           borderRadius: theme.radius.lg,
-          backgroundColor: theme.role.ink,
+          backgroundColor: theme.role.primary,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Text style={{ ...theme.type.display, color: theme.role.ground }}>+</Text>
+        <Text style={{ ...theme.type.display, color: theme.role.onPrimary }}>+</Text>
       </Pressable>
     </Screen>
   );

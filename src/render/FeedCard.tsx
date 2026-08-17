@@ -1,26 +1,45 @@
-import { Image, Pressable, Text, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { Image, Text, View } from 'react-native';
 import type { FeedDate } from '@/domain/dates/repository';
+import { STOP_KINDS, type StopKind } from '@/domain/stops/taxonomy';
 import { formatMoney, money } from '@/domain/money/money';
-import { MicroLabel } from '@/ui/MicroLabel';
+import { Card } from '@/ui/Card';
 import { theme } from '@/ui/theme';
-import { tap } from '@/ui/feedback';
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const COVER_HEIGHT = 96;
 
-const COVER_ASPECT_RATIO = 4 / 5;
-
-const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const WEEKDAYS_BY_ZELLER_H = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as const;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
- * "2026-07-29" -> "29 JUL". Sliced from the ISO string rather than built via
- * `Date`, which parses as UTC midnight and can shift the day once rendered in
- * a non-UTC timezone — the round-trip the rest of the app deliberately avoids.
+ * Zeller's congruence, run on the ISO string's own digits. No `Date` is built,
+ * so there is no UTC-midnight parse to shift the day once rendered in a
+ * non-UTC timezone — the round-trip the rest of the app deliberately avoids.
+ * h=0 is Saturday .. h=6 is Friday for the Gregorian calendar.
  */
+function zellerH(year: number, month: number, day: number): number {
+  const isJanOrFeb = month < 3;
+  const m = isJanOrFeb ? month + 12 : month;
+  const y = isJanOrFeb ? year - 1 : year;
+  const k = y % 100;
+  const j = Math.floor(y / 100);
+  return (day + Math.floor((13 * (m + 1)) / 5) + k + Math.floor(k / 4) + Math.floor(j / 4) + 5 * j) % 7;
+}
+
+/** "2026-07-29" -> "Sat 29 Jul". */
 function formatDateLabel(occurredOn: string): string {
-  const day = occurredOn.slice(8, 10);
-  const monthIndex = Number.parseInt(occurredOn.slice(5, 7), 10) - 1;
-  return `${day} ${MONTHS[monthIndex] ?? ''}`;
+  const year = Number.parseInt(occurredOn.slice(0, 4), 10);
+  const month = Number.parseInt(occurredOn.slice(5, 7), 10);
+  const day = Number.parseInt(occurredOn.slice(8, 10), 10);
+  const weekday = WEEKDAYS_BY_ZELLER_H[zellerH(year, month, day)] ?? '';
+  return `${weekday} ${day} ${MONTHS[month - 1] ?? ''}`;
+}
+
+function isStopKind(value: string): value is StopKind {
+  return (STOP_KINDS as readonly string[]).includes(value);
+}
+
+function kindLabel(kind: string): string {
+  return kind.charAt(0).toUpperCase() + kind.slice(1);
 }
 
 interface Props {
@@ -29,56 +48,65 @@ interface Props {
 }
 
 /**
- * An editorial entry, not a card: no border, no fill of its own. Most dates
- * never get a cover photo, so the no-photo layout is the default appearance —
- * it ends at the meta line with no reserved block, not a placeholder.
+ * A `Card`: the strip and cards-with-space-between direction the editorial
+ * layout was rejected in favour of. Most dates never get a cover photo, so
+ * the no-photo layout is the default appearance — it goes straight from the
+ * card's rounded top to the body, no reserved block and no placeholder.
  *
- * The image (when present) is full-bleed: this component carries no
- * horizontal padding of its own so the photo can span edge to edge, and the
- * text block below applies `theme.screenMargin` itself. The FlatList that
- * renders these must not add horizontal padding, or the bleed is lost.
+ * `Card` itself owns the press scale and the `tap()` haptic, so this
+ * component has no animation or gesture code of its own.
  */
 export function FeedCard({ date, onPress }: Props) {
   const total = formatMoney(money(date.totalMinor, date.currencyCode));
   const stopLabel = date.stopCount === 1 ? '1 stop' : `${date.stopCount} stops`;
 
-  const pressed = useSharedValue(0);
-  const animated = useAnimatedStyle(() => ({
-    transform: [{ scale: withTiming(pressed.value === 1 ? 0.99 : 1, { duration: theme.motion.fast }) }],
-  }));
-
   return (
-    <AnimatedPressable
-      onPressIn={() => { pressed.value = 1; }}
-      onPressOut={() => { pressed.value = 0; }}
-      onPress={() => { tap(); onPress(); }}
-      style={[{ marginBottom: theme.space.xl }, animated]}
-    >
-      <View style={{ paddingHorizontal: theme.screenMargin, marginTop: theme.space.lg }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.xs }}>
-          {date.status === 'published' && (
-            <View style={{ width: 2, height: 12, backgroundColor: theme.role.gold }} />
-          )}
-          <MicroLabel>{formatDateLabel(date.occurredOn)}</MicroLabel>
-        </View>
-        <Text
-          style={{ ...theme.type.display, color: theme.role.ink, marginTop: theme.space.xs }}
-          numberOfLines={2}
-        >
-          {date.title ?? 'Untitled date'}
-        </Text>
-        <Text style={{ ...theme.type.meta, color: theme.role.inkMuted, marginTop: theme.space.xs }}>
-          {stopLabel} · {total}
-        </Text>
-      </View>
-
+    <Card padded={false} onPress={onPress}>
       {date.coverUri !== null && (
         <Image
           source={{ uri: date.coverUri }}
-          style={{ width: '100%', aspectRatio: COVER_ASPECT_RATIO, marginTop: theme.space.md }}
+          style={{ width: '100%', height: COVER_HEIGHT }}
           resizeMode="cover"
         />
       )}
-    </AnimatedPressable>
+
+      <View style={{ padding: theme.space.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+          <Text
+            style={{ ...theme.type.title, color: theme.role.ink, flex: 1, marginRight: theme.space.sm }}
+            numberOfLines={1}
+          >
+            {date.title ?? 'Untitled date'}
+          </Text>
+          <Text style={{ ...theme.type.title, color: theme.role.ink }}>{total}</Text>
+        </View>
+
+        <Text style={{ ...theme.type.meta, color: theme.role.inkMuted, marginTop: theme.space.xs }}>
+          {formatDateLabel(date.occurredOn)} · {stopLabel}
+        </Text>
+
+        {date.kinds.length > 0 && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.space.xs, marginTop: theme.space.sm }}>
+            {date.kinds.map((kind) => {
+              const tint = isStopKind(kind) ? theme.kind[kind] : theme.kind.other;
+              return (
+                <View
+                  key={kind}
+                  style={{
+                    paddingHorizontal: theme.space.sm,
+                    paddingVertical: 3,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: tint,
+                  }}
+                >
+                  <Text style={{ ...theme.type.micro, color: tint }}>{kindLabel(kind)}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </View>
+    </Card>
   );
 }
