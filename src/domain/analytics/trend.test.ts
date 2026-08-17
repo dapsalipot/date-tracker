@@ -4,7 +4,7 @@ import { createTestDb, testDeps } from '@/test/testDb';
 import { couples, dates, stops } from '@/db/schema';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop } from '@/domain/dates/repository';
-import { monthlyTrend } from './trend';
+import { monthlyTrend, perDateAverage } from './trend';
 
 function setup() {
   const db = createTestDb();
@@ -90,5 +90,65 @@ describe('monthlyTrend', () => {
     spend(db, ctx, 'food', 30000, '2026-08-01', 'a');
 
     expect(monthlyTrend(db, scope, '2026-08', 1)[0]?.totalMinor).toBe(30000);
+  });
+});
+
+describe('perDateAverage', () => {
+  it('divides a month\'s spend by its number of dates', () => {
+    const { db, ctx, scope } = setup();
+    spend(db, ctx, 'food', 30000, '2026-08-01', 'a');
+    spend(db, ctx, 'food', 50000, '2026-08-02', 'b');
+
+    const avg = perDateAverage(db, scope, '2026-08', 12);
+
+    expect(avg.monthDateCount).toBe(2);
+    expect(avg.monthMinor).toBe(40000);
+  });
+
+  it('counts one date once however many stops it has', () => {
+    const { db, ctx, scope } = setup();
+    const deps = testDeps(Date.parse('2026-08-01T12:00:00Z'), '2026-08-01', 'one');
+    captureStop(db, deps, { coupleId: ctx.coupleId, userId: ctx.userId, kind: 'food', amountMinor: 30000, currencyCode: 'PHP' });
+    captureStop(db, deps, { coupleId: ctx.coupleId, userId: ctx.userId, kind: 'transport', amountMinor: 10000, currencyCode: 'PHP' });
+
+    const avg = perDateAverage(db, scope, '2026-08', 12);
+
+    expect(avg.monthDateCount).toBe(1);
+    expect(avg.monthMinor).toBe(40000);
+  });
+
+  it('reports null rather than zero when the month has no dates', () => {
+    const { db, scope } = setup();
+
+    const avg = perDateAverage(db, scope, '2026-08', 12);
+
+    // Zero would read as "our dates were free this month".
+    expect(avg.monthMinor).toBeNull();
+    expect(avg.monthDateCount).toBe(0);
+  });
+
+  it('compares against the trailing window mean', () => {
+    const { db, ctx, scope } = setup();
+    spend(db, ctx, 'food', 10000, '2026-06-01', 'j');
+    spend(db, ctx, 'food', 10000, '2026-07-01', 'k');
+    spend(db, ctx, 'food', 70000, '2026-08-01', 'l');
+
+    const avg = perDateAverage(db, scope, '2026-08', 12);
+
+    expect(avg.monthMinor).toBe(70000);
+    // Three dates, ₱900 total.
+    expect(avg.trailingMinor).toBe(30000);
+  });
+
+  it('rounds to whole minor units', () => {
+    const { db, ctx, scope } = setup();
+    spend(db, ctx, 'food', 10000, '2026-08-01', 'a');
+    spend(db, ctx, 'food', 10001, '2026-08-02', 'b');
+    spend(db, ctx, 'food', 10001, '2026-08-03', 'c');
+
+    const avg = perDateAverage(db, scope, '2026-08', 12);
+
+    expect(Number.isInteger(avg.monthMinor)).toBe(true);
+    expect(avg.monthMinor).toBe(10001);
   });
 });
