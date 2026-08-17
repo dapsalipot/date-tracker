@@ -17,7 +17,7 @@ export interface DateAverage {
 }
 
 /**
- * `monthScope` in spend.ts scopes to one month by equality and doesn't fit a
+ * `monthScope` scopes to one month by equality and doesn't fit a
  * range query, so the couple/currency/tombstone filters are repeated here
  * rather than forced through it — see the task report for why extracting a
  * range-shaped sibling wasn't done in this pass.
