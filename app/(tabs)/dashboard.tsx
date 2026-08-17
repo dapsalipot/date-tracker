@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { db } from '@/db/client';
 import { getAppDeps, getLocalContext } from '@/session';
@@ -12,6 +11,10 @@ import { monthlyTrend, perDateAverage } from '@/domain/analytics/trend';
 import { topPlaces } from '@/domain/analytics/places';
 import { formatMoney, money } from '@/domain/money/money';
 import { Bar } from '@/ui/Bar';
+import { Card } from '@/ui/Card';
+import { MicroLabel } from '@/ui/MicroLabel';
+import { Screen } from '@/ui/Screen';
+import { STOP_KINDS, type StopKind } from '@/domain/stops/taxonomy';
 import { theme } from '@/ui/theme';
 
 const TREND_MONTHS = 12;
@@ -33,8 +36,16 @@ function formatPeriodMonth(periodMonth: string): string {
   return `${name} ${year}`;
 }
 
-const sectionHeader = { fontSize: 11, letterSpacing: 1, color: theme.color.muted } as const;
-const muted = { color: theme.color.muted } as const;
+const muted = { ...theme.type.meta, color: theme.role.inkMuted } as const;
+
+function isStopKind(value: string): value is StopKind {
+  return (STOP_KINDS as readonly string[]).includes(value);
+}
+
+/** Bars are the one place a kind colour fills rather than outlines. */
+function kindTint(kind: string): string {
+  return isStopKind(kind) ? theme.kind[kind] : theme.kind.other;
+}
 
 export default function Dashboard() {
   const ctx = getLocalContext();
@@ -74,169 +85,218 @@ export default function Dashboard() {
   const topTrendTotal = Math.max(...trend.map((m) => m.totalMinor), 1);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.color.cream }}>
-      <View style={{ padding: theme.space.md, gap: theme.space.lg }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+    <Screen>
+      {/*
+        The month stepper is a drawer hanging from the top edge, matching the
+        feed's budget header. Nothing on this screen sits loose on the ground —
+        every section below is a Card.
+      */}
+      <View style={{ marginHorizontal: -theme.screenMargin }}>
+        <View
+          style={{
+            backgroundColor: theme.role.surface,
+            borderBottomLeftRadius: theme.radius.lg,
+            borderBottomRightRadius: theme.radius.lg,
+            paddingHorizontal: theme.screenMargin,
+            paddingVertical: theme.space.md,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
           <Pressable onPress={() => step(-1)} hitSlop={12}>
-            <Text style={{ fontSize: 24, color: theme.color.ink }}>‹</Text>
+            <Text style={{ ...theme.type.title, color: theme.role.ink }}>‹</Text>
           </Pressable>
-          <Text style={{ fontSize: 20, fontWeight: '800', color: theme.color.ink }}>
+          <Text style={{ ...theme.type.title, color: theme.role.ink }}>
             {formatPeriodMonth(periodMonth)}
           </Text>
           <Pressable onPress={() => step(1)} disabled={periodMonth === currentMonth} hitSlop={12}>
-            <Text style={{ fontSize: 24, color: periodMonth === currentMonth ? theme.color.line : theme.color.ink }}>
+            <Text
+              style={{
+                ...theme.type.title,
+                color: periodMonth === currentMonth ? theme.role.line : theme.role.ink,
+              }}
+            >
               ›
             </Text>
           </Pressable>
-        </View>
-
-        {/* Section 1 — this month */}
-        <View style={{ gap: theme.space.sm }}>
-          <Text style={sectionHeader}>THIS MONTH</Text>
-          {budgetMinor === null ? (
-            <>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: theme.color.ink }}>
-                {formatMoney(money(budget.spentMinor, ctx.currencyCode))} spent
-              </Text>
-              <Text style={muted}>No budget set</Text>
-            </>
-          ) : (
-            <>
-              <Bar
-                label="Spent"
-                value={`${formatMoney(money(budget.spentMinor, ctx.currencyCode))} of ${formatMoney(money(budgetMinor, ctx.currencyCode))}`}
-                fraction={budget.spentMinor / budgetMinor}
-                tint={budget.isOverBudget ? theme.color.rose : theme.color.gold}
-              />
-              {budget.remainingMinor !== null && budget.daysLeft > 0 && (
-                <Text style={muted}>
-                  {formatMoney(money(budget.remainingMinor, ctx.currencyCode))} left · {budget.daysLeft}d
-                </Text>
-              )}
-            </>
-          )}
-        </View>
-
-        {/* Section 2 — where it went */}
-        <View style={{ gap: theme.space.sm }}>
-          {drilledKind ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={sectionHeader}>{drilledKind.toUpperCase()}</Text>
-              <Pressable onPress={() => setDrilledKind(null)}>
-                <Text style={{ color: theme.color.rose, fontWeight: '700' }}>‹ All kinds</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <Text style={sectionHeader}>WHERE IT WENT</Text>
-          )}
-
-          {kindSlices.length === 0 ? (
-            <Text style={muted}>Nothing logged this month</Text>
-          ) : drilledKind ? (
-            <View style={{ gap: theme.space.sm }}>
-              {subkindSlices.map((slice) => (
-                <Bar
-                  key={slice.key}
-                  label={slice.key.toUpperCase()}
-                  value={formatMoney(money(slice.totalMinor, ctx.currencyCode))}
-                  fraction={slice.totalMinor / topSubkindTotal}
-                />
-              ))}
-            </View>
-          ) : (
-            <View style={{ gap: theme.space.sm }}>
-              {kindSlices.map((slice) => (
-                <Bar
-                  key={slice.key}
-                  label={slice.key.toUpperCase()}
-                  value={formatMoney(money(slice.totalMinor, ctx.currencyCode))}
-                  fraction={slice.totalMinor / topKindTotal}
-                  onPress={() => setDrilledKind(slice.key)}
-                />
-              ))}
-            </View>
-          )}
         </View>
       </View>
 
       {/*
         flex: 1 is load-bearing. React Native defaults flexShrink to 0, so a
-        ScrollView with no flex is sized by its content: once the fixed block
-        above plus this content exceed the viewport, its frame runs past the
-        screen edge, gets clipped, and has nothing left to scroll — sections 4
-        and 5 become unreachable on a smaller phone or at large text sizes.
+        ScrollView with no flex is sized by its content, runs past the screen
+        edge, and has nothing left to scroll.
       */}
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: theme.space.md, paddingTop: 0, gap: theme.space.lg }}
+        contentContainerStyle={{ paddingTop: theme.space.md, paddingBottom: theme.space.xxl, gap: theme.space.md }}
       >
-        {/* Section 3 — trend */}
-        <View style={{ gap: theme.space.sm }}>
-          <Text style={sectionHeader}>TREND</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: TREND_CHART_HEIGHT, gap: theme.space.xs }}>
-            {trend.map((m) => (
-              <View key={m.periodMonth} style={{ flex: 1, alignItems: 'center' }}>
-                <View
-                  style={{
-                    width: '100%',
-                    height: Math.max((m.totalMinor / topTrendTotal) * TREND_CHART_HEIGHT, TREND_MIN_SLIVER),
-                    borderRadius: 3,
-                    backgroundColor: m.periodMonth === periodMonth ? theme.color.rose : theme.color.blush,
-                  }}
-                />
+        <Card>
+          <MicroLabel>THIS MONTH</MicroLabel>
+          {budgetMinor === null ? (
+            <>
+              <Text style={{ ...theme.type.display, color: theme.role.primary, marginTop: theme.space.xs }}>
+                {formatMoney(money(budget.spentMinor, ctx.currencyCode))}
+              </Text>
+              <Text style={muted}>spent · no budget set</Text>
+            </>
+          ) : (
+            <>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.space.sm, marginTop: theme.space.xs }}>
+                <Text style={{ ...theme.type.display, color: theme.role.primary }}>
+                  {formatMoney(money(budget.spentMinor, ctx.currencyCode))}
+                </Text>
+                <Text style={muted}>of {formatMoney(money(budgetMinor, ctx.currencyCode))}</Text>
               </View>
+              {/* Segmented by kind: the breakdown and the headline are one object. */}
+              <View
+                style={{
+                  height: 8,
+                  borderRadius: theme.radius.sm,
+                  backgroundColor: theme.role.line,
+                  marginTop: theme.space.sm,
+                  overflow: 'hidden',
+                  flexDirection: 'row',
+                }}
+              >
+                {kindSlices.map((slice) => (
+                  <View
+                    key={slice.key}
+                    style={{
+                      width: `${Math.max(0, Math.min(1, slice.totalMinor / budgetMinor)) * 100}%`,
+                      height: '100%',
+                      backgroundColor: kindTint(slice.key),
+                    }}
+                  />
+                ))}
+              </View>
+              {budget.remainingMinor !== null && (
+                <Text style={{ ...muted, marginTop: theme.space.sm }}>
+                  {formatMoney(money(budget.remainingMinor, ctx.currencyCode))} left
+                  {budget.daysLeft > 0 ? ` · ${budget.daysLeft}d` : ''}
+                </Text>
+              )}
+            </>
+          )}
+        </Card>
+
+        <Card>
+          {drilledKind ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <MicroLabel>{drilledKind.toUpperCase()}</MicroLabel>
+              <Pressable onPress={() => setDrilledKind(null)} hitSlop={8}>
+                <Text style={{ ...theme.type.meta, color: theme.role.primary }}>‹ All kinds</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <MicroLabel>WHERE IT WENT</MicroLabel>
+          )}
+
+          <View style={{ gap: theme.space.sm, marginTop: theme.space.sm }}>
+            {kindSlices.length === 0 ? (
+              <Text style={muted}>Nothing logged this month</Text>
+            ) : drilledKind ? (
+              subkindSlices.map((slice) => (
+                <Bar
+                  key={slice.key}
+                  label={slice.key}
+                  value={formatMoney(money(slice.totalMinor, ctx.currencyCode))}
+                  fraction={slice.totalMinor / topSubkindTotal}
+                  tint={kindTint(drilledKind)}
+                />
+              ))
+            ) : (
+              kindSlices.map((slice) => (
+                <Bar
+                  key={slice.key}
+                  label={slice.key}
+                  value={formatMoney(money(slice.totalMinor, ctx.currencyCode))}
+                  fraction={slice.totalMinor / topKindTotal}
+                  tint={kindTint(slice.key)}
+                  onPress={() => setDrilledKind(slice.key)}
+                />
+              ))
+            )}
+          </View>
+        </Card>
+
+        <Card>
+          <MicroLabel>TREND</MicroLabel>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'flex-end',
+              height: TREND_CHART_HEIGHT,
+              gap: 2,
+              marginTop: theme.space.sm,
+            }}
+          >
+            {trend.map((m) => (
+              <View
+                key={m.periodMonth}
+                style={{
+                  flex: 1,
+                  height: Math.max((m.totalMinor / topTrendTotal) * TREND_CHART_HEIGHT, TREND_MIN_SLIVER),
+                  borderRadius: 2,
+                  backgroundColor: m.periodMonth === periodMonth ? theme.role.primary : theme.role.line,
+                }}
+              />
             ))}
           </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            {/* Twelve rotated labels are unreadable on a phone — only the ends are labelled. */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: theme.space.xs }}>
+            {/* Twelve rotated labels are unreadable on a phone — only the ends. */}
             <Text style={muted}>{trend[0] ? formatPeriodMonth(trend[0].periodMonth) : ''}</Text>
             <Text style={muted}>
               {trend.length > 0 ? formatPeriodMonth(trend[trend.length - 1]!.periodMonth) : ''}
             </Text>
           </View>
-        </View>
+        </Card>
 
-        {/* Section 4 — per-date average */}
-        <View style={{ gap: theme.space.sm }}>
-          <Text style={sectionHeader}>PER-DATE AVERAGE</Text>
+        <Card>
+          <MicroLabel>PER-DATE AVERAGE</MicroLabel>
           {average.monthMinor === null ? (
-            <Text style={muted}>No dates this month</Text>
+            <Text style={{ ...muted, marginTop: theme.space.xs }}>No dates this month</Text>
           ) : (
             <>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: theme.color.ink }}>
-                {formatMoney(money(average.monthMinor, ctx.currencyCode))} this month
+              <Text style={{ ...theme.type.display, color: theme.role.ink, marginTop: theme.space.xs }}>
+                {formatMoney(money(average.monthMinor, ctx.currencyCode))}
               </Text>
               {average.trailingMinor !== null && (
                 <Text style={muted}>
-                  {formatMoney(money(average.trailingMinor, ctx.currencyCode))} trailing {TREND_MONTHS}mo ·{' '}
                   {average.monthMinor > average.trailingMinor
-                    ? '↑ up'
+                    ? '↑ above'
                     : average.monthMinor < average.trailingMinor
-                      ? '↓ down'
-                      : '→ flat'}
+                      ? '↓ below'
+                      : '→ level with'}{' '}
+                  the {formatMoney(money(average.trailingMinor, ctx.currencyCode))} usual
                 </Text>
               )}
             </>
           )}
-        </View>
+        </Card>
 
-        {/* Section 5 — most expensive places */}
-        <View style={{ gap: theme.space.sm }}>
-          <Text style={sectionHeader}>MOST EXPENSIVE PLACES</Text>
-          {places.length === 0 ? (
-            <Text style={muted}>Place names are optional, set in the composer — log a few and they’ll show up here.</Text>
-          ) : (
-            <View style={{ gap: theme.space.xs }}>
-              {places.map((place) => (
-                <View key={place.placeName} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ color: theme.color.ink }}>{place.placeName}</Text>
+        <Card>
+          <MicroLabel>MOST EXPENSIVE PLACES</MicroLabel>
+          <View style={{ gap: theme.space.sm, marginTop: theme.space.sm }}>
+            {places.length === 0 ? (
+              <Text style={muted}>
+                Place names are optional, set in the composer — log a few and they’ll show up here.
+              </Text>
+            ) : (
+              places.map((place) => (
+                <View
+                  key={place.placeName}
+                  style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}
+                >
+                  <Text style={{ ...theme.type.body, color: theme.role.ink }}>{place.placeName}</Text>
                   <Text style={muted}>{formatMoney(money(place.totalMinor, ctx.currencyCode))}</Text>
                 </View>
-              ))}
-            </View>
-          )}
-        </View>
+              ))
+            )}
+          </View>
+        </Card>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }

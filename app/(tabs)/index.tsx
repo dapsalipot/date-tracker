@@ -47,18 +47,74 @@ export default function Feed() {
   // it when either list changes is sufficient: every stop write changes one.
   const budget = useMemo(() => computeBudgetStatus(db, ctx, deps), [ctx, deps, draftRows, publishedRows]);
 
-  const remaining =
+  // The headline is the number alone; "left to spend" and the day count are
+  // separate, smaller lines. Cramming them into one display-size string made
+  // the whole header read as one shouted sentence.
+  const headlineAmount =
     budget.remainingMinor === null
       ? 'No budget set'
-      : `${formatMoney(money(budget.remainingMinor, ctx.currencyCode))} left · ${budget.daysLeft}d`;
+      : formatMoney(money(budget.remainingMinor, ctx.currencyCode));
+
+  const spentFraction =
+    budget.budgetMinor === null || budget.budgetMinor === 0
+      ? 0
+      : Math.max(0, Math.min(1, budget.spentMinor / budget.budgetMinor));
 
   return (
     <Screen>
-      <View style={{ paddingTop: theme.space.sm }}>
-        <MicroLabel>{monthLabel(budget.periodMonth)}</MicroLabel>
-        <Text style={{ ...theme.type.display, color: theme.role.primary, marginTop: theme.space.xs }}>
-          {remaining}
-        </Text>
+      {/*
+        A drawer that hangs from the top of the screen: square top corners so it
+        reads as attached to the edge, rounded bottom so it reads as a card.
+        Nothing sits loose on the ground — a number floating on the background
+        looks like debug output, not a header.
+      */}
+      <View style={{ marginHorizontal: -theme.screenMargin, marginBottom: theme.space.md }}>
+        <View
+          style={{
+            backgroundColor: theme.role.surface,
+            borderBottomLeftRadius: theme.radius.lg,
+            borderBottomRightRadius: theme.radius.lg,
+            paddingHorizontal: theme.screenMargin,
+            paddingTop: theme.space.sm,
+            paddingBottom: theme.space.md,
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <MicroLabel>{monthLabel(budget.periodMonth)}</MicroLabel>
+            {budget.budgetMinor !== null && (
+              <Text style={{ ...theme.type.meta, color: theme.role.inkMuted }}>
+                {budget.daysLeft}d left
+              </Text>
+            )}
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.space.sm, marginTop: theme.space.xs }}>
+            <Text style={{ ...theme.type.display, color: theme.role.primary }}>{headlineAmount}</Text>
+            {budget.budgetMinor !== null && (
+              <Text style={{ ...theme.type.meta, color: theme.role.inkMuted }}>left to spend</Text>
+            )}
+          </View>
+
+          {budget.budgetMinor !== null && (
+            <View
+              style={{
+                height: 6,
+                borderRadius: theme.radius.sm,
+                backgroundColor: theme.role.line,
+                marginTop: theme.space.sm,
+                overflow: 'hidden',
+              }}
+            >
+              <View
+                style={{
+                  width: `${spentFraction * 100}%`,
+                  height: '100%',
+                  backgroundColor: budget.isOverBudget ? theme.role.primary : theme.role.ink,
+                }}
+              />
+            </View>
+          )}
+        </View>
       </View>
 
       {drafts.length > 0 && (
