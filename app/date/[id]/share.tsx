@@ -9,7 +9,11 @@ import { dateDetailQuery } from '@/domain/dates/compose';
 import { buildReceiptViewModel, type MoneyMode } from '@/domain/export/receipt';
 import { ReceiptCanvas, RECEIPT_SIZES, type ReceiptSize } from '@/render/receipt/ReceiptTemplate';
 import { shareReceipt } from '@/render/receipt/export';
+import { Button } from '@/ui/Button';
+import { Card } from '@/ui/Card';
+import { MicroLabel } from '@/ui/MicroLabel';
 import { theme } from '@/ui/theme';
+import { commit } from '@/ui/feedback';
 
 /**
  * Plain language, not mode names. "tier" means nothing to someone deciding
@@ -59,6 +63,7 @@ export default function Share() {
     setSharing(true);
     try {
       await shareReceipt(vm, size);
+      commit();
     } catch (err) {
       // shareReceipt throws deliberately and distinguishably — it has no UI of
       // its own, so the message belongs here. Spec §10 wants a retry offered
@@ -78,19 +83,25 @@ export default function Share() {
 
   if (vm === null) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.color.cream, justifyContent: 'center', padding: theme.space.lg }}>
-        <Text style={{ color: theme.color.ink }}>That date no longer exists.</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground, justifyContent: 'center', padding: theme.space.lg }}>
+        <Card>
+          <Text style={{ ...theme.type.body, color: theme.role.ink, textAlign: 'center' }}>
+            That date no longer exists.
+          </Text>
+        </Card>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.color.cream }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground }}>
       <ScrollView contentContainerStyle={{ padding: theme.space.md, gap: theme.space.md }}>
         {/*
           The canvas always renders at its true export size; only this box
           scales it to fit. That is the point of Skia here — the exported
-          pixels do not depend on this phone's screen.
+          pixels do not depend on this phone's screen. The receipt itself stays
+          on its own light, fixed-1080px palette by design (spec §7) — it is not
+          converted to the dark roles used everywhere else in this app.
         */}
         <View
           style={{
@@ -99,7 +110,7 @@ export default function Share() {
             overflow: 'hidden',
             borderRadius: theme.radius.md,
             borderWidth: 1,
-            borderColor: theme.color.line,
+            borderColor: theme.role.line,
             alignSelf: 'center',
           }}
         >
@@ -108,73 +119,81 @@ export default function Share() {
           </View>
         </View>
 
-        <Text style={{ color: theme.color.muted, textAlign: 'center' }}>
-          {vm.stopCount === 1 ? '1 stop' : `${vm.stopCount} stops`} · {vm.occurredOn}
-        </Text>
-
-        <Text style={{ fontSize: 11, letterSpacing: 1, color: theme.color.muted }}>MONEY</Text>
-        <View style={{ flexDirection: 'row', gap: theme.space.sm }}>
-          {MODES.map((option) => {
-            const selected = option.mode === moneyMode;
-            return (
-              <Pressable
-                key={option.mode}
-                onPress={() => setMoneyMode(option.mode)}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  paddingVertical: theme.space.sm,
-                  borderRadius: 999,
-                  backgroundColor: selected ? theme.color.rose : theme.color.blush,
-                }}
-              >
-                <Text style={{ fontWeight: '600', color: selected ? theme.color.cream : theme.color.ink }}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Text style={{ fontSize: 11, letterSpacing: 1, color: theme.color.muted }}>SIZE</Text>
-        <View style={{ flexDirection: 'row', gap: theme.space.sm }}>
-          {SIZES.map((option) => {
-            const selected = option.size === size;
-            return (
-              <Pressable
-                key={option.size}
-                onPress={() => setSize(option.size)}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  paddingVertical: theme.space.sm,
-                  borderRadius: 999,
-                  backgroundColor: selected ? theme.color.ink : theme.color.blush,
-                }}
-              >
-                <Text style={{ fontWeight: '600', color: selected ? theme.color.cream : theme.color.ink }}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Pressable
-          onPress={share}
-          disabled={sharing}
-          style={{
-            alignItems: 'center',
-            paddingVertical: theme.space.md,
-            borderRadius: theme.radius.md,
-            backgroundColor: theme.color.ink,
-            opacity: sharing ? 0.4 : 1,
-          }}
-        >
-          <Text style={{ color: theme.color.cream, fontWeight: '700', fontSize: 16 }}>
-            {sharing ? 'Preparing…' : 'Share'}
+        <Card>
+          <Text style={{ ...theme.type.meta, color: theme.role.inkMuted, textAlign: 'center' }}>
+            {vm.stopCount === 1 ? '1 stop' : `${vm.stopCount} stops`} · {vm.occurredOn}
           </Text>
-        </Pressable>
+        </Card>
+
+        <Card>
+          <MicroLabel>MONEY</MicroLabel>
+          <View style={{ flexDirection: 'row', gap: theme.space.sm, marginTop: theme.space.sm }}>
+            {MODES.map((option) => {
+              const selected = option.mode === moneyMode;
+              return (
+                <Pressable
+                  key={option.mode}
+                  onPress={() => setMoneyMode(option.mode)}
+                  style={{
+                    flex: 1,
+                    alignItems: 'center',
+                    paddingVertical: theme.space.sm,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: selected ? theme.role.primary : theme.role.line,
+                    backgroundColor: selected ? theme.role.primary : 'transparent',
+                  }}
+                >
+                  <Text
+                    style={{
+                      ...theme.type.meta,
+                      fontWeight: '600',
+                      color: selected ? theme.role.onPrimary : theme.role.inkMuted,
+                    }}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Card>
+
+        <Card>
+          <MicroLabel>SIZE</MicroLabel>
+          <View style={{ flexDirection: 'row', gap: theme.space.sm, marginTop: theme.space.sm }}>
+            {SIZES.map((option) => {
+              const selected = option.size === size;
+              return (
+                <Pressable
+                  key={option.size}
+                  onPress={() => setSize(option.size)}
+                  style={{
+                    flex: 1,
+                    alignItems: 'center',
+                    paddingVertical: theme.space.sm,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: selected ? theme.role.primary : theme.role.line,
+                    backgroundColor: selected ? theme.role.primary : 'transparent',
+                  }}
+                >
+                  <Text
+                    style={{
+                      ...theme.type.meta,
+                      fontWeight: '600',
+                      color: selected ? theme.role.onPrimary : theme.role.inkMuted,
+                    }}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Card>
+
+        <Button label={sharing ? 'Preparing…' : 'Share'} onPress={() => { void share(); }} disabled={sharing} />
       </ScrollView>
     </SafeAreaView>
   );
