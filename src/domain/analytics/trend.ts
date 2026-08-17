@@ -2,6 +2,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import { dates, stops } from '@/db/schema';
 import type { AppDatabase } from '@/db/types';
 import type { CoupleScope } from '@/domain/scope';
+import { monthRangeScope } from './scope';
 import { trailingMonths } from './period';
 
 export interface MonthTotal {
@@ -33,15 +34,7 @@ export function monthlyTrend(
     })
     .from(stops)
     .innerJoin(dates, and(eq(dates.id, stops.dateId), isNull(dates.deletedAt)))
-    .where(
-      and(
-        eq(dates.coupleId, scope.coupleId),
-        eq(stops.currencyCode, scope.currencyCode),
-        isNull(stops.deletedAt),
-        sql`substr(${dates.occurredOn}, 1, 7) >= ${first}`,
-        sql`substr(${dates.occurredOn}, 1, 7) <= ${last}`,
-      ),
-    )
+    .where(monthRangeScope(scope, first, last))
     .groupBy(sql`substr(${dates.occurredOn}, 1, 7)`)
     .all();
 

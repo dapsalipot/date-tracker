@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createTestDb, testDeps } from '@/test/testDb';
-import { stops } from '@/db/schema';
+import { couples, dates, stops } from '@/db/schema';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop } from '@/domain/dates/repository';
 import { monthlyTrend } from './trend';
@@ -54,6 +54,24 @@ describe('monthlyTrend', () => {
     expect(monthlyTrend(db, scope, '2026-08', 1)).toEqual([
       { periodMonth: '2026-08', totalMinor: 50000 },
     ]);
+  });
+
+  it("ignores another couple's spending", () => {
+    const { db, ctx, scope } = setup();
+    spend(db, ctx, 'food', 30000, '2026-08-01', 'a');
+    db.insert(couples).values({
+      id: 'them', currencyCode: 'PHP', timezone: 'Asia/Manila', createdAt: 1, updatedAt: 1,
+    }).run();
+    db.insert(dates).values({
+      id: 'their-date', coupleId: 'them', occurredOn: '2026-08-05', status: 'published',
+      createdBy: ctx.userId, updatedAt: 1,
+    }).run();
+    db.insert(stops).values({
+      id: 'their-stop', dateId: 'their-date', sortOrder: 0, kind: 'food',
+      amountMinor: 500000, currencyCode: 'PHP', updatedAt: 1,
+    }).run();
+
+    expect(monthlyTrend(db, scope, '2026-08', 1)[0]?.totalMinor).toBe(30000);
   });
 
   it('excludes spend older than the window', () => {
