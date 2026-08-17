@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, SectionList, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Pressable, SectionList, Text, TextInput, View } from 'react-native';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { db } from '@/db/client';
+import { dailySpend } from '@/domain/analytics/daily';
+import { shiftMonth } from '@/domain/analytics/period';
 import { toFeedDate, type FeedDate } from '@/domain/dates/repository';
 import { draftDatesQuery, listQueuedStops, publishedDatesQuery, type QueuedStop } from '@/domain/dates/drafts';
 import { formatMoney, money } from '@/domain/money/money';
@@ -13,6 +15,7 @@ import { persistPickedImage } from '@/media/store';
 import { FeedCard, kindLabel } from '@/render/FeedCard';
 import { seedTwelveMonths } from '@/fixtures/seed';
 import { getAppDeps, getLocalContext } from '@/session';
+import { CalendarGrid } from '@/ui/CalendarGrid';
 import { Card } from '@/ui/Card';
 import { KindIcon } from '@/ui/KindIcon';
 import { MicroLabel } from '@/ui/MicroLabel';
@@ -35,6 +38,13 @@ function monthLabel(monthKey: string): string {
   const year = monthKey.slice(0, 4);
   const monthIndex = Number.parseInt(monthKey.slice(5, 7), 10) - 1;
   return `${MONTH_NAMES[monthIndex] ?? ''} ${year}`.trim();
+}
+
+/** "2026-08-18" -> "Aug 18", for the "showing one day" header under the grid. */
+function dayLabel(occurredOn: string): string {
+  const monthIndex = Number.parseInt(occurredOn.slice(5, 7), 10) - 1;
+  const day = Number.parseInt(occurredOn.slice(8, 10), 10);
+  return `${MONTH_NAMES[monthIndex]?.slice(0, 3) ?? ''} ${day}`;
 }
 
 const MINUTE_MS = 60_000;
@@ -103,6 +113,17 @@ export default function Feed() {
   const [search, setSearch] = useState('');
   const [attachingPhoto, setAttachingPhoto] = useState(false);
 
+  const todayLocal = deps.clock.todayLocal();
+  const currentMonth = todayLocal.slice(0, 7);
+  const [periodMonth, setPeriodMonth] = useState(currentMonth);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  // Guards against a stale pick from a month the stepper has since left —
+  // derived rather than reset in an effect, so leaving and returning to a
+  // month restores the pick instead of losing it.
+  const effectiveSelectedDay = selectedDay !== null && selectedDay.slice(0, 7) === periodMonth ? selectedDay : null;
+
+  const isSearching = search.trim() !== '';
+
   // Filtering happens here, over the rows the live queries already loaded —
   // no query changes for a search box.
   const filteredPublished = useMemo(() => {
@@ -118,8 +139,11 @@ export default function Feed() {
 
   // Grouped in one pass: `published` is already ordered newest-first, so
   // inserting into a Map keyed by month preserves that order for both the
-  // sections and each section's own dates — no re-sort needed.
-  const sections = useMemo(() => {
+  // sections and each section's own dates — no re-sort needed. Only used
+  // while searching: a query can span months, so results still need a month
+  // header to place them. The calendar already supplies that context for the
+  // single-month view below.
+  const searchSections = useMemo(() => {
     const byMonth = new Map<string, MonthSection>();
     for (const date of filteredPublished) {
       const monthKey = date.occurredOn.slice(0, 7);
@@ -133,6 +157,25 @@ export default function Feed() {
     }
     return Array.from(byMonth.values());
   }, [filteredPublished]);
+
+  // The single month the calendar is showing — what the list below renders
+  // when there's no active search. `published` is already newest-first.
+  const monthDates = useMemo(
+    () => published.filter((d) => d.occurredOn.slice(0, 7) === periodMonth),
+    [published, periodMonth],
+  );
+  const displayedMonthDates = useMemo(
+    () => (effectiveSelectedDay === null ? monthDates : monthDates.filter((d) => d.occurredOn === effectiveSelectedDay)),
+    [monthDates, effectiveSelectedDay],
+  );
+
+  // dailySpend is a plain read, not a live query of its own — like the
+  // dashboard's other domain reads, it rides draftRows/publishedRows's
+  // reactivity so a fresh capture recolours the grid without a new subscription.
+  const heatDays = useMemo(
+    () => dailySpend(db, ctx, periodMonth),
+    [periodMonth, ctx, draftRows, publishedRows],
+  );
 
   const attachPhotoToLatestQueued = async () => {
     if (attachingPhoto) return;
@@ -285,32 +328,93 @@ export default function Feed() {
         </Card>
       </View>
 
-      <SectionList
-        style={{ flex: 1 }}
-        sections={sections}
-        keyExtractor={(item) => item.id}
-        stickySectionHeadersEnabled={false}
-        contentContainerStyle={{ paddingBottom: theme.space.xxl, gap: theme.space.md }}
-        renderSectionHeader={({ section }) => <MonthHeader section={section} currencyCode={ctx.currencyCode} />}
-        renderItem={({ item }) => (
-          <FeedCard date={item} onPress={() => router.push(`/date/${item.id}`)} />
-        )}
-        ListEmptyComponent={
-          drafts.length === 0 && published.length === 0 ? (
-            <Card onPress={() => seedTwelveMonths(db, ctx.coupleId, ctx.userId, deps.clock.todayLocal(), deps)}>
-              <Text style={{ ...theme.type.body, fontWeight: '600', color: theme.role.ink, textAlign: 'center' }}>
-                Seed 12 months of demo dates
-              </Text>
-            </Card>
-          ) : search.trim() !== '' ? (
+      {/*
+        Calendar is the default: it picks the month, the list below just
+        shows what's in it. A non-empty search spans months incoherently
+        against a single-month grid, so search hides the calendar and falls
+        back to the old month-grouped list across every month instead.
+      */}
+      {!isSearching && (
+        <View style={{ marginBottom: theme.space.md }}>
+          <CalendarGrid
+            periodMonth={periodMonth}
+            todayLocal={todayLocal}
+            days={heatDays}
+            selectedDay={effectiveSelectedDay}
+            onSelectDay={(day) => setSelectedDay((cur) => (cur === day ? null : day))}
+            onStepMonth={(delta) => setPeriodMonth((p) => shiftMonth(p, delta))}
+            canStepForward={periodMonth !== currentMonth}
+          />
+        </View>
+      )}
+
+      {!isSearching && effectiveSelectedDay !== null && (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingBottom: theme.space.xs,
+            marginBottom: theme.space.sm,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.role.line,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.xs }}>
+            <Ionicons name="calendar-outline" size={14} color={theme.role.inkMuted} />
+            <MicroLabel>{dayLabel(effectiveSelectedDay).toUpperCase()}</MicroLabel>
+          </View>
+          <Pressable onPress={() => setSelectedDay(null)} hitSlop={8}>
+            <Text style={{ ...theme.type.meta, color: theme.role.primary }}>All month</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {isSearching ? (
+        <SectionList
+          style={{ flex: 1 }}
+          sections={searchSections}
+          keyExtractor={(item) => item.id}
+          stickySectionHeadersEnabled={false}
+          contentContainerStyle={{ paddingBottom: theme.space.xxl, gap: theme.space.md }}
+          renderSectionHeader={({ section }) => <MonthHeader section={section} currencyCode={ctx.currencyCode} />}
+          renderItem={({ item }) => (
+            <FeedCard date={item} onPress={() => router.push(`/date/${item.id}`)} />
+          )}
+          ListEmptyComponent={
             <Card>
               <Text style={{ ...theme.type.body, color: theme.role.inkMuted, textAlign: 'center' }}>
                 No dates match "{search.trim()}"
               </Text>
             </Card>
-          ) : null
-        }
-      />
+          }
+        />
+      ) : (
+        <FlatList
+          style={{ flex: 1 }}
+          data={displayedMonthDates}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingBottom: theme.space.xxl, gap: theme.space.md }}
+          renderItem={({ item }) => (
+            <FeedCard date={item} onPress={() => router.push(`/date/${item.id}`)} />
+          )}
+          ListEmptyComponent={
+            drafts.length === 0 && published.length === 0 ? (
+              <Card onPress={() => seedTwelveMonths(db, ctx.coupleId, ctx.userId, todayLocal, deps)}>
+                <Text style={{ ...theme.type.body, fontWeight: '600', color: theme.role.ink, textAlign: 'center' }}>
+                  Seed 12 months of demo dates
+                </Text>
+              </Card>
+            ) : (
+              <Card>
+                <Text style={{ ...theme.type.body, color: theme.role.inkMuted, textAlign: 'center' }}>
+                  {effectiveSelectedDay !== null ? 'Nothing logged this day' : 'Nothing logged this month'}
+                </Text>
+              </Card>
+            )
+          }
+        />
+      )}
 
       <Pressable
         onPress={() => { tap(); router.push('/capture'); }}
