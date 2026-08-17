@@ -8,9 +8,9 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 type Variant = 'primary' | 'quiet' | 'danger';
 
 const SURFACE: Record<Variant, { background: string; border: string; text: string }> = {
-  primary: { background: theme.role.ink, border: theme.role.ink, text: theme.role.ground },
-  quiet: { background: 'transparent', border: theme.role.rule, text: theme.role.ink },
-  danger: { background: 'transparent', border: 'transparent', text: theme.role.accent },
+  primary: { background: theme.role.primary, border: theme.role.primary, text: theme.role.onPrimary },
+  quiet: { background: 'transparent', border: theme.role.line, text: theme.role.ink },
+  danger: { background: 'transparent', border: 'transparent', text: theme.role.primary },
 };
 
 /**

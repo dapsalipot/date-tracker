@@ -13,14 +13,17 @@ interface Props {
  * never required — so tapping the selected chip clears it. `other` has no
  * subkinds at all, and rendering an empty scroller for it would look broken.
  *
- * Styling matches KindChips.tsx exactly (pill radius, rose/blush treatment)
- * so the two chip rows read as one system. contentContainerStyle omits
- * horizontal padding because this component sits inside an already-padded
- * ScrollView in the stop editor, unlike KindChips' unpadded container.
+ * Styling matches KindChips.tsx exactly (pill radius, outline-only treatment,
+ * coloured by the parent kind) so the two chip rows read as one system.
+ * contentContainerStyle omits horizontal padding because this component sits
+ * inside an already-padded ScrollView in the stop editor, unlike KindChips'
+ * unpadded container.
  */
 export function SubkindChips({ kind, selected, onSelect }: Props) {
   const options = SUBKINDS[kind];
   if (options.length === 0) return null;
+
+  const tint = theme.kind[kind];
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: theme.space.sm }}>
@@ -34,10 +37,12 @@ export function SubkindChips({ kind, selected, onSelect }: Props) {
               paddingHorizontal: theme.space.md,
               paddingVertical: theme.space.sm,
               borderRadius: 999,
-              backgroundColor: isSelected ? theme.color.rose : theme.color.blush,
+              backgroundColor: 'transparent',
+              borderWidth: isSelected ? 1.5 : 1,
+              borderColor: isSelected ? tint : theme.role.line,
             }}
           >
-            <Text style={{ fontWeight: '600', color: isSelected ? theme.color.cream : theme.color.ink }}>
+            <Text style={{ fontWeight: '600', color: isSelected ? tint : theme.role.inkMuted }}>
               {option}
             </Text>
           </Pressable>
