@@ -5,7 +5,7 @@ import { dates, photos, stops } from '@/db/schema';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop, listFeedDates } from '@/domain/dates/repository';
 import { attachPhoto } from '@/domain/photos/repository';
-import { listDraftDates, publishedDatesQuery } from './drafts';
+import { listDraftDates, listQueuedStops, publishedDatesQuery } from './drafts';
 
 const AUG_3 = testDeps(1_785_000_000_000, '2026-08-03');
 const AUG_4 = testDeps(1_785_090_000_000, '2026-08-04');
@@ -15,6 +15,51 @@ function setup() {
   const ctx = ensureLocalContext(db, AUG_3);
   return { db, scope: { coupleId: ctx.coupleId, currencyCode: ctx.currencyCode }, ctx };
 }
+
+describe('listQueuedStops', () => {
+  it('lists stops on draft dates, newest first, with their date', () => {
+    const { db, ctx, scope } = setup();
+    const first = captureStop(db, AUG_3, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'food', amountMinor: 42000, currencyCode: 'PHP', label: 'Coffee',
+    });
+    captureStop(db, AUG_4, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'transport', amountMinor: 8000, currencyCode: 'PHP',
+    });
+
+    const queued = listQueuedStops(db, scope);
+
+    // The header lists what is waiting, so the most recent capture leads.
+    expect(queued).toHaveLength(2);
+    expect(queued[0]?.kind).toBe('transport');
+    expect(queued[1]?.label).toBe('Coffee');
+    expect(queued[1]?.dateId).toBe(first.dateId);
+    expect(queued[0]?.occurredAt).toBeGreaterThan(queued[1]!.occurredAt!);
+  });
+
+  it('excludes stops on published dates', () => {
+    const { db, ctx, scope } = setup();
+    const captured = captureStop(db, AUG_3, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
+    });
+    db.update(dates).set({ status: 'published' }).where(eq(dates.id, captured.dateId)).run();
+
+    expect(listQueuedStops(db, scope)).toEqual([]);
+  });
+
+  it('excludes tombstoned stops and another couple', () => {
+    const { db, ctx, scope } = setup();
+    const dead = captureStop(db, AUG_3, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'food', amountMinor: 9900, currencyCode: 'PHP',
+    });
+    db.update(stops).set({ deletedAt: 1 }).where(eq(stops.id, dead.stopId)).run();
+
+    expect(listQueuedStops(db, scope)).toEqual([]);
+  });
+});
 
 describe('listDraftDates', () => {
   it('returns only drafts', () => {
