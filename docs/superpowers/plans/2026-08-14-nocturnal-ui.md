@@ -196,7 +196,7 @@ Committing with `tsc` failing is deliberate here and only here — Task 3 closes
 
 **Files:**
 - Create: `src/ui/Card.tsx`
-- Modify: `src/ui/Button.tsx`, `src/ui/KindChips.tsx`, `src/ui/SubkindChips.tsx`, `src/ui/Bar.tsx`
+- Modify: `src/ui/Button.tsx`, `src/ui/Rule.tsx`, `src/ui/KindChips.tsx`, `src/ui/SubkindChips.tsx`, `src/ui/Bar.tsx`
 
 **Interfaces:**
 - Produces: `<Card>{children}</Card>` accepting `onPress?`, `padded?: boolean` (default true).
@@ -279,7 +279,7 @@ Run: `npx vitest run --testTimeout=30000` → **190**, unchanged.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/ui/Card.tsx src/ui/Button.tsx src/ui/KindChips.tsx src/ui/SubkindChips.tsx src/ui/Bar.tsx
+git add src/ui/Card.tsx src/ui/Button.tsx src/ui/Rule.tsx src/ui/KindChips.tsx src/ui/SubkindChips.tsx src/ui/Bar.tsx
 git commit -m "feat: add Card and adapt the primitives to the dark palette"
 ```
 
