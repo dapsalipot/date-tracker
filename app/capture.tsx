@@ -2,11 +2,14 @@ import { useMemo, useState } from 'react';
 import { Alert, Image, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { db } from '@/db/client';
+import { dates, stops } from '@/db/schema';
 import { captureStop } from '@/domain/dates/repository';
 import { computeBudgetStatus } from '@/domain/budget/status';
+import { addPerson, listPeople } from '@/domain/identity/people';
 import { kindsByRecentUse } from '@/domain/stops/recent';
 import { formatMoney, money, parseMajorToMinor } from '@/domain/money/money';
 import type { StopKind } from '@/domain/stops/taxonomy';
@@ -17,8 +20,33 @@ import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { KindChips } from '@/ui/KindChips';
 import { MicroLabel } from '@/ui/MicroLabel';
+import { PayerPicker } from '@/ui/PayerPicker';
 import { theme } from '@/ui/theme';
 import { commit } from '@/ui/feedback';
+
+/**
+ * Who paid last, couple-wide. Not exposed by the domain layer, so this reads
+ * `stops`/`dates` directly rather than growing a new domain query for one
+ * screen-local default — the capture sheet already owns `db`.
+ */
+function mostRecentPayer(coupleId: string, fallback: string): string {
+  const row = db
+    .select({ paidByUserId: stops.paidByUserId })
+    .from(stops)
+    .innerJoin(dates, eq(stops.dateId, dates.id))
+    .where(
+      and(
+        eq(dates.coupleId, coupleId),
+        isNull(stops.deletedAt),
+        isNull(dates.deletedAt),
+        isNotNull(stops.paidByUserId),
+      ),
+    )
+    .orderBy(desc(stops.updatedAt))
+    .limit(1)
+    .all()[0];
+  return row?.paidByUserId ?? fallback;
+}
 
 const PHOTO_TILE = 58;
 
@@ -26,11 +54,16 @@ export default function Capture() {
   const deps = getAppDeps();
   const ctx = getLocalContext();
   const kinds = useMemo(() => kindsByRecentUse(db, ctx.coupleId), [ctx.coupleId]);
+  const [people, setPeople] = useState(() => listPeople(db, ctx.coupleId));
+  const defaultPayerId = useMemo(() => mostRecentPayer(ctx.coupleId, ctx.userId), [ctx.coupleId, ctx.userId]);
 
   const [amount, setAmount] = useState('');
   const [kind, setKind] = useState<StopKind>(kinds[0] ?? 'food');
+  const [payerId, setPayerId] = useState<string | null>(null);
   const [pendingPhoto, setPendingPhoto] = useState<{ uri: string; width: number; height: number } | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const selectedPayerId = payerId ?? defaultPayerId;
 
   const budget = useMemo(() => computeBudgetStatus(db, ctx, deps), [ctx, deps]);
   const remaining =
@@ -82,7 +115,7 @@ export default function Capture() {
       // write a duplicate charge.
       captureStop(db, deps, {
         coupleId: ctx.coupleId,
-        userId: ctx.userId,
+        userId: selectedPayerId,
         kind,
         amountMinor,
         currencyCode: ctx.currencyCode,
@@ -135,6 +168,20 @@ export default function Capture() {
           several.
         */}
         <AmountKeypad value={amount} onChange={setAmount} currencyCode={ctx.currencyCode} />
+
+        <View style={{ paddingHorizontal: theme.space.md, gap: theme.space.sm }}>
+          <MicroLabel>WHO PAID</MicroLabel>
+          <PayerPicker
+            people={people}
+            selected={selectedPayerId}
+            onSelect={setPayerId}
+            onAdd={(displayName) => {
+              const id = addPerson(db, deps, ctx.coupleId, displayName);
+              setPeople(listPeople(db, ctx.coupleId));
+              return id;
+            }}
+          />
+        </View>
 
         <View style={{ paddingHorizontal: theme.space.md }}>
           <MicroLabel>KIND</MicroLabel>
