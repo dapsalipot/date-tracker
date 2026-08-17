@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Image, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { db } from '@/db/client';
@@ -12,8 +13,14 @@ import type { StopKind } from '@/domain/stops/taxonomy';
 import { persistPickedImage } from '@/media/store';
 import { getAppDeps, getLocalContext } from '@/session';
 import { AmountKeypad } from '@/ui/AmountKeypad';
+import { Button } from '@/ui/Button';
+import { Card } from '@/ui/Card';
 import { KindChips } from '@/ui/KindChips';
+import { MicroLabel } from '@/ui/MicroLabel';
 import { theme } from '@/ui/theme';
+import { commit } from '@/ui/feedback';
+
+const PHOTO_TILE = 58;
 
 export default function Capture() {
   const deps = getAppDeps();
@@ -89,6 +96,7 @@ export default function Capture() {
             : null,
       });
 
+      commit();
       router.back();
     } catch {
       // Leave the sheet open and the amount untouched — the work is still
@@ -103,34 +111,65 @@ export default function Capture() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.color.cream }}>
-      <View style={{ padding: theme.space.md, flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Pressable onPress={() => router.back()}>
-          <Text style={{ color: theme.color.muted, fontSize: 16 }}>Cancel</Text>
-        </Pressable>
-        <Text style={{ color: budget.isOverBudget ? theme.color.rose : theme.color.muted }}>{remaining}</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: theme.space.md,
+          paddingTop: theme.space.sm,
+        }}
+      >
+        <Button variant="quiet" label="Cancel" onPress={() => router.back()} />
+        <Text style={{ ...theme.type.meta, color: budget.isOverBudget ? theme.role.primary : theme.role.inkMuted }}>
+          {remaining}
+        </Text>
       </View>
 
-      <AmountKeypad value={amount} onChange={setAmount} currencyCode={ctx.currencyCode} />
+      <View style={{ flex: 1, paddingTop: theme.space.md, gap: theme.space.md }}>
+        {/*
+          Full-bleed rather than inset like the feed's cards: this keypad is
+          the whole point of a five-second capture sheet, and giving it the
+          entire width makes it the obvious hero rather than one card among
+          several.
+        */}
+        <AmountKeypad value={amount} onChange={setAmount} currencyCode={ctx.currencyCode} />
 
-      <View style={{ paddingVertical: theme.space.md }}>
+        <View style={{ paddingHorizontal: theme.space.md }}>
+          <MicroLabel>KIND</MicroLabel>
+        </View>
         <KindChips kinds={kinds} selected={kind} onSelect={setKind} />
       </View>
 
-      <View style={{ flexDirection: 'row', gap: theme.space.sm, padding: theme.space.md, marginTop: 'auto' }}>
-        <Pressable
-          onPress={pickPhoto}
-          style={{ paddingHorizontal: theme.space.lg, paddingVertical: theme.space.md, borderRadius: theme.radius.md, backgroundColor: theme.color.blush }}
-        >
-          <Text style={{ fontSize: 20 }}>{pendingPhoto ? '✓📷' : '📷'}</Text>
-        </Pressable>
-        <Pressable
-          onPress={save}
-          disabled={saving}
-          style={{ flex: 1, alignItems: 'center', paddingVertical: theme.space.md, borderRadius: theme.radius.md, backgroundColor: theme.color.ink, opacity: saving ? 0.5 : 1 }}
-        >
-          <Text style={{ color: theme.color.cream, fontWeight: '700', fontSize: 16 }}>Save</Text>
-        </Pressable>
+      <View
+        style={{
+          flexDirection: 'row',
+          gap: theme.space.sm,
+          paddingHorizontal: theme.space.md,
+          paddingTop: theme.space.sm,
+          paddingBottom: theme.space.md,
+        }}
+      >
+        <View style={{ width: PHOTO_TILE, height: PHOTO_TILE }}>
+          <Card padded={false} onPress={() => { void pickPhoto(); }}>
+            <View style={{ width: PHOTO_TILE, height: PHOTO_TILE, alignItems: 'center', justifyContent: 'center' }}>
+              {pendingPhoto ? (
+                <Image
+                  source={{ uri: pendingPhoto.uri }}
+                  style={{ width: PHOTO_TILE, height: PHOTO_TILE }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Ionicons name="camera-outline" size={24} color={theme.role.inkMuted} />
+              )}
+            </View>
+          </Card>
+        </View>
+
+        <View style={{ flex: 1 }}>
+          <Button label={saving ? 'Saving…' : 'Save'} onPress={() => { void save(); }} disabled={saving} />
+        </View>
       </View>
     </SafeAreaView>
   );

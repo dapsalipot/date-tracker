@@ -1,5 +1,8 @@
 import { Pressable, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { currencySymbol, minorExponent } from '@/domain/money/money';
+import { Card } from './Card';
+import { tap } from './feedback';
 import { theme } from './theme';
 
 const ALL_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'] as const;
@@ -40,6 +43,7 @@ export function AmountKeypad({ value, onChange, currencyCode, placeholder }: Pro
   const keys = exponent === 0 ? ALL_KEYS.filter((key) => key !== '.') : ALL_KEYS;
 
   const press = (key: string) => {
+    tap();
     if (key === '⌫') return onChange(value.slice(0, -1));
 
     const [whole, fraction] = value.split('.');
@@ -62,19 +66,25 @@ export function AmountKeypad({ value, onChange, currencyCode, placeholder }: Pro
   };
 
   const symbol = currencySymbol(currencyCode);
+  const showingPlaceholder = value === '' && placeholder !== undefined;
 
   return (
-    <View>
+    <Card>
+      {/*
+        The one deliberate oversize: this is the screen's hero number, and the
+        five-step type scale tops out at `display` (34), too small to carry a
+        keypad readout. Every other size on this component is a theme token.
+      */}
       <Text
         style={{
           fontSize: 44,
           fontWeight: '800',
           textAlign: 'center',
           paddingVertical: theme.space.md,
-          color: value === '' && placeholder !== undefined ? theme.color.muted : theme.color.ink,
+          color: showingPlaceholder ? theme.role.inkMuted : theme.role.primary,
         }}
       >
-        {value === '' && placeholder !== undefined ? placeholder : `${symbol}${value === '' ? '0' : value}`}
+        {showingPlaceholder ? placeholder : `${symbol}${value === '' ? '0' : value}`}
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         {keys.map((key) => (
@@ -83,10 +93,14 @@ export function AmountKeypad({ value, onChange, currencyCode, placeholder }: Pro
             onPress={() => press(key)}
             style={{ width: '33.33%', paddingVertical: theme.space.md, alignItems: 'center' }}
           >
-            <Text style={{ fontSize: 26, color: theme.color.ink }}>{key}</Text>
+            {key === '⌫' ? (
+              <Ionicons name="backspace-outline" size={22} color={theme.role.ink} />
+            ) : (
+              <Text style={{ ...theme.type.title, fontWeight: '600', color: theme.role.ink }}>{key}</Text>
+            )}
           </Pressable>
         ))}
       </View>
-    </View>
+    </Card>
   );
 }
