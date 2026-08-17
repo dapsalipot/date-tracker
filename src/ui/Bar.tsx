@@ -37,8 +37,8 @@ export function Bar({ label, value, fraction, tint = theme.role.primary, segment
   return (
     <Pressable onPress={onPress} disabled={!onPress} style={{ gap: theme.space.xs }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={{ color: theme.color.ink, fontWeight: '600' }}>{label}</Text>
-        <Text style={{ color: theme.color.muted }}>{value}</Text>
+        <Text style={{ color: theme.role.ink, fontWeight: '600' }}>{label}</Text>
+        <Text style={{ color: theme.role.inkMuted }}>{value}</Text>
       </View>
       <View
         style={{
