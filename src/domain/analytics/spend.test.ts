@@ -115,6 +115,30 @@ describe('spendBySubkind', () => {
     expect(slices.map((s) => s.totalMinor)).toEqual([80000, 20000]);
   });
 
+  it("ignores another couple's spending in the same kind", () => {
+    const { db, ctx, scope } = setup();
+    spend(db, ctx, 'food', 20000, '2026-08-01', 'a');
+    db.insert(couples).values({
+      id: 'them', currencyCode: 'PHP', timezone: 'Asia/Manila', createdAt: 1, updatedAt: 1,
+    }).run();
+    db.insert(dates).values({
+      id: 'their-date', coupleId: 'them', occurredOn: '2026-08-05', status: 'published',
+      createdBy: ctx.userId, updatedAt: 1,
+    }).run();
+    db.insert(stops).values({
+      id: 'their-stop', dateId: 'their-date', sortOrder: 0, kind: 'food',
+      subkind: 'restaurant', amountMinor: 500000, currencyCode: 'PHP', updatedAt: 1,
+    }).run();
+
+    // The drill-down carries the same scoping as the bar it drills into. When
+    // these were two hand-written filter sets, every mutation aimed at the bar
+    // passed straight through the drill.
+    const slices = spendBySubkind(db, scope, AUG, 'food');
+
+    expect(slices.map((s) => s.key)).not.toContain('restaurant');
+    expect(slices.reduce((sum, s) => sum + s.totalMinor, 0)).toBe(20000);
+  });
+
   it('groups stops with no subkind under "unsorted"', () => {
     const { db, ctx, scope } = setup();
     spend(db, ctx, 'food', 20000, '2026-08-01', 'a');

@@ -15,25 +15,30 @@ export const UNSORTED_SUBKIND = 'unsorted';
 const totalExpr = sql<number>`sum(${stops.amountMinor})`;
 const countExpr = sql<number>`count(${stops.id})`;
 
-function monthScoped(db: AppDatabase, scope: CoupleScope, periodMonth: string) {
-  return db
-    .select({ kind: stops.kind, subkind: stops.subkind, total: totalExpr, stops: countExpr })
-    .from(stops)
-    .innerJoin(dates, and(eq(dates.id, stops.dateId), isNull(dates.deletedAt)))
-    .where(
-      and(
-        eq(dates.coupleId, scope.coupleId),
-        eq(stops.currencyCode, scope.currencyCode),
-        isNull(stops.deletedAt),
-        // Attribution follows the parent date's local day, never the stop's own
-        // timestamp — a date past midnight counts entirely in one month.
-        sql`substr(${dates.occurredOn}, 1, 7) = ${periodMonth}`,
-      ),
-    );
+/**
+ * The one scoping predicate both aggregations share. Written once because it
+ * was duplicated once and the copy went unguarded: every mutation aimed at the
+ * kind query passed straight through the subkind query, which carried its own
+ * identical filters that no test touched. One predicate means one thing to
+ * test and no second copy to drift.
+ */
+function monthScope(scope: CoupleScope, periodMonth: string) {
+  return and(
+    eq(dates.coupleId, scope.coupleId),
+    eq(stops.currencyCode, scope.currencyCode),
+    isNull(stops.deletedAt),
+    // Attribution follows the parent date's local day, never the stop's own
+    // timestamp — a date past midnight counts entirely in one month.
+    sql`substr(${dates.occurredOn}, 1, 7) = ${periodMonth}`,
+  );
 }
 
 export function spendByKind(db: AppDatabase, scope: CoupleScope, periodMonth: string): SpendSlice[] {
-  return monthScoped(db, scope, periodMonth)
+  return db
+    .select({ kind: stops.kind, total: totalExpr, stops: countExpr })
+    .from(stops)
+    .innerJoin(dates, and(eq(dates.id, stops.dateId), isNull(dates.deletedAt)))
+    .where(monthScope(scope, periodMonth))
     .groupBy(stops.kind)
     .orderBy(desc(totalExpr))
     .all()
@@ -58,15 +63,7 @@ export function spendBySubkind(
     })
     .from(stops)
     .innerJoin(dates, and(eq(dates.id, stops.dateId), isNull(dates.deletedAt)))
-    .where(
-      and(
-        eq(dates.coupleId, scope.coupleId),
-        eq(stops.currencyCode, scope.currencyCode),
-        eq(stops.kind, kind),
-        isNull(stops.deletedAt),
-        sql`substr(${dates.occurredOn}, 1, 7) = ${periodMonth}`,
-      ),
-    )
+    .where(and(monthScope(scope, periodMonth), eq(stops.kind, kind)))
     .groupBy(sql`coalesce(${stops.subkind}, ${UNSORTED_SUBKIND})`)
     .orderBy(desc(totalExpr))
     .all()
