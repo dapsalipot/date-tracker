@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { db } from '@/db/client';
@@ -8,9 +8,17 @@ import { publishedDatesQuery } from '@/domain/dates/drafts';
 import { shiftMonth } from '@/domain/analytics/period';
 import { budgetStatusFor } from '@/domain/budget/status';
 import { spendByKind, spendBySubkind } from '@/domain/analytics/spend';
+import { monthlyTrend, perDateAverage } from '@/domain/analytics/trend';
+import { topPlaces } from '@/domain/analytics/places';
 import { formatMoney, money } from '@/domain/money/money';
 import { Bar } from '@/ui/Bar';
 import { theme } from '@/ui/theme';
+
+const TREND_MONTHS = 12;
+const TREND_CHART_HEIGHT = 80;
+/** A zero-spend month still gets a visible sliver — the gap is the point. */
+const TREND_MIN_SLIVER = 3;
+const TOP_PLACES_LIMIT = 5;
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -53,13 +61,17 @@ export default function Dashboard() {
       budget: budgetStatusFor(db, ctx, periodMonth, todayLocal),
       kindSlices: spendByKind(db, ctx, periodMonth),
       subkindSlices: drilledKind ? spendBySubkind(db, ctx, periodMonth, drilledKind) : [],
+      trend: monthlyTrend(db, ctx, periodMonth, TREND_MONTHS),
+      average: perDateAverage(db, ctx, periodMonth, TREND_MONTHS),
+      places: topPlaces(db, ctx, periodMonth, TOP_PLACES_LIMIT, TREND_MONTHS),
     };
   }, [periodMonth, drilledKind, ctx, deps, publishedRows]);
 
-  const { budget, kindSlices, subkindSlices } = vm;
+  const { budget, kindSlices, subkindSlices, trend, average, places } = vm;
   const budgetMinor = budget.budgetMinor;
   const topKindTotal = kindSlices[0]?.totalMinor ?? 1;
   const topSubkindTotal = subkindSlices[0]?.totalMinor ?? 1;
+  const topTrendTotal = Math.max(...trend.map((m) => m.totalMinor), 1);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.color.cream }}>
@@ -146,6 +158,75 @@ export default function Dashboard() {
           )}
         </View>
       </View>
+
+      <ScrollView contentContainerStyle={{ padding: theme.space.md, paddingTop: 0, gap: theme.space.lg }}>
+        {/* Section 3 — trend */}
+        <View style={{ gap: theme.space.sm }}>
+          <Text style={sectionHeader}>TREND</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: TREND_CHART_HEIGHT, gap: theme.space.xs }}>
+            {trend.map((m) => (
+              <View key={m.periodMonth} style={{ flex: 1, alignItems: 'center' }}>
+                <View
+                  style={{
+                    width: '100%',
+                    height: Math.max((m.totalMinor / topTrendTotal) * TREND_CHART_HEIGHT, TREND_MIN_SLIVER),
+                    borderRadius: 3,
+                    backgroundColor: m.periodMonth === periodMonth ? theme.color.rose : theme.color.blush,
+                  }}
+                />
+              </View>
+            ))}
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            {/* Twelve rotated labels are unreadable on a phone — only the ends are labelled. */}
+            <Text style={muted}>{trend[0] ? formatPeriodMonth(trend[0].periodMonth) : ''}</Text>
+            <Text style={muted}>
+              {trend.length > 0 ? formatPeriodMonth(trend[trend.length - 1]!.periodMonth) : ''}
+            </Text>
+          </View>
+        </View>
+
+        {/* Section 4 — per-date average */}
+        <View style={{ gap: theme.space.sm }}>
+          <Text style={sectionHeader}>PER-DATE AVERAGE</Text>
+          {average.monthMinor === null ? (
+            <Text style={muted}>No dates this month</Text>
+          ) : (
+            <>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: theme.color.ink }}>
+                {formatMoney(money(average.monthMinor, ctx.currencyCode))} this month
+              </Text>
+              {average.trailingMinor !== null && (
+                <Text style={muted}>
+                  {formatMoney(money(average.trailingMinor, ctx.currencyCode))} trailing {TREND_MONTHS}mo ·{' '}
+                  {average.monthMinor > average.trailingMinor
+                    ? '↑ up'
+                    : average.monthMinor < average.trailingMinor
+                      ? '↓ down'
+                      : '→ flat'}
+                </Text>
+              )}
+            </>
+          )}
+        </View>
+
+        {/* Section 5 — most expensive places */}
+        <View style={{ gap: theme.space.sm }}>
+          <Text style={sectionHeader}>MOST EXPENSIVE PLACES</Text>
+          {places.length === 0 ? (
+            <Text style={muted}>Place names are optional, set in the composer — log a few and they’ll show up here.</Text>
+          ) : (
+            <View style={{ gap: theme.space.xs }}>
+              {places.map((place) => (
+                <View key={place.placeName} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ color: theme.color.ink }}>{place.placeName}</Text>
+                  <Text style={muted}>{formatMoney(money(place.totalMinor, ctx.currencyCode))}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
