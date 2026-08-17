@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Text, View } from 'react-native';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import migrations from '../drizzle/migrations';
@@ -32,6 +33,7 @@ export default function RootLayout() {
   // Without this, the only way out of a detail screen was the iOS edge-swipe —
   // undiscoverable, and absent entirely on Android.
   return (
+    <SafeAreaProvider>
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: theme.color.cream },
@@ -41,12 +43,13 @@ export default function RootLayout() {
         contentStyle: { backgroundColor: theme.color.cream },
       }}
     >
-      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="capture" options={{ presentation: 'modal', headerShown: false }} />
       <Stack.Screen name="date/[id]/index" options={{ title: 'Date' }} />
       <Stack.Screen name="date/[id]/compose" options={{ title: 'Compose' }} />
       <Stack.Screen name="date/[id]/share" options={{ title: 'Share' }} />
       <Stack.Screen name="date/[id]/stop/[stopId]" options={{ title: 'Edit stop' }} />
     </Stack>
+    </SafeAreaProvider>
   );
 }
