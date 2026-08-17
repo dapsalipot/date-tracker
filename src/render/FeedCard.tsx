@@ -1,8 +1,8 @@
 import { Image, Text, View } from 'react-native';
 import type { FeedDate } from '@/domain/dates/repository';
-import { STOP_KINDS, type StopKind } from '@/domain/stops/taxonomy';
 import { formatMoney, money } from '@/domain/money/money';
 import { Card } from '@/ui/Card';
+import { isStopKind, KindIcon } from '@/ui/KindIcon';
 import { theme } from '@/ui/theme';
 
 const COVER_HEIGHT = 96;
@@ -34,11 +34,8 @@ function formatDateLabel(occurredOn: string): string {
   return `${weekday} ${day} ${MONTHS[month - 1] ?? ''}`;
 }
 
-function isStopKind(value: string): value is StopKind {
-  return (STOP_KINDS as readonly string[]).includes(value);
-}
-
-function kindLabel(kind: string): string {
+/** Exported so the feed's queued-stop rows can label a kind the same way. */
+export function kindLabel(kind: string): string {
   return kind.charAt(0).toUpperCase() + kind.slice(1);
 }
 
@@ -93,6 +90,9 @@ export function FeedCard({ date, onPress }: Props) {
                 <View
                   key={kind}
                   style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
                     paddingHorizontal: theme.space.sm,
                     paddingVertical: 3,
                     borderRadius: 999,
@@ -100,6 +100,7 @@ export function FeedCard({ date, onPress }: Props) {
                     borderColor: tint,
                   }}
                 >
+                  <KindIcon kind={kind} size={12} color={tint} />
                   <Text style={{ ...theme.type.micro, color: tint }}>{kindLabel(kind)}</Text>
                 </View>
               );
