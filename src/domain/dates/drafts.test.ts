@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createTestDb, testDeps } from '@/test/testDb';
-import { dates, photos } from '@/db/schema';
+import { dates, photos, stops } from '@/db/schema';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
-import { captureStop } from '@/domain/dates/repository';
+import { captureStop, listFeedDates } from '@/domain/dates/repository';
 import { attachPhoto } from '@/domain/photos/repository';
 import { listDraftDates, publishedDatesQuery } from './drafts';
 
@@ -53,7 +53,7 @@ describe('listDraftDates', () => {
 
 describe('publishedDatesQuery cover photo', () => {
   it('carries the cover photo uri onto the feed card', () => {
-    const { db, ctx } = setup();
+    const { db, ctx, scope } = setup();
     const captured = captureStop(db, AUG_3, {
       coupleId: ctx.coupleId, userId: ctx.userId,
       kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
@@ -70,8 +70,48 @@ describe('publishedDatesQuery cover photo', () => {
     expect(feed[0]?.coverUri).toBe('file:///cover.jpg');
   });
 
+  it('lists the distinct kinds on a date, sorted', () => {
+    const { db, ctx, scope } = setup();
+    const captured = captureStop(db, AUG_3, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'transport', amountMinor: 8000, currencyCode: 'PHP',
+    });
+    captureStop(db, AUG_3, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
+    });
+    captureStop(db, AUG_3, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'food', amountMinor: 1000, currencyCode: 'PHP',
+    });
+    db.update(dates).set({ title: 'Movie night', status: 'published' })
+      .where(eq(dates.id, captured.dateId)).run();
+
+    const feed = listFeedDates(db, scope);
+
+    // The feed card shows these as chips, so they must be distinct and in a
+    // stable order — group_concat's own order is unspecified.
+    expect(feed[0]?.kinds).toEqual(['food', 'transport']);
+  });
+
+  it('reports no kinds for a date whose stops are all tombstoned', () => {
+    const { db, ctx, scope } = setup();
+    const captured = captureStop(db, AUG_3, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
+    });
+    db.update(stops).set({ deletedAt: 1 }).where(eq(stops.id, captured.stopId)).run();
+    db.update(dates).set({ title: 'Empty', status: 'published' })
+      .where(eq(dates.id, captured.dateId)).run();
+
+    const feed = listFeedDates(db, scope);
+
+    expect(feed).toHaveLength(1);
+    expect(feed[0]?.kinds).toEqual([]);
+  });
+
   it('reports no cover for a date that has none', () => {
-    const { db, ctx } = setup();
+    const { db, ctx, scope } = setup();
     const captured = captureStop(db, AUG_3, {
       coupleId: ctx.coupleId, userId: ctx.userId,
       kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
@@ -88,7 +128,7 @@ describe('publishedDatesQuery cover photo', () => {
   });
 
   it('reports no cover when the cover photo has been tombstoned', () => {
-    const { db, ctx } = setup();
+    const { db, ctx, scope } = setup();
     const captured = captureStop(db, AUG_3, {
       coupleId: ctx.coupleId, userId: ctx.userId,
       kind: 'food', amountMinor: 42000, currencyCode: 'PHP',
@@ -107,7 +147,7 @@ describe('publishedDatesQuery cover photo', () => {
   });
 
   it('does not let the cover join inflate the stop count or total', () => {
-    const { db, ctx } = setup();
+    const { db, ctx, scope } = setup();
     const captured = captureStop(db, AUG_3, {
       coupleId: ctx.coupleId, userId: ctx.userId,
       kind: 'food', amountMinor: 42000, currencyCode: 'PHP',

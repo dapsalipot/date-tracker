@@ -18,7 +18,7 @@ Three commits from the abandoned editorial attempt are **kept, not reverted**: t
 
 ## Global Constraints
 
-- **Zero domain changes. All 186 tests must stay green, untouched.** A moved or edited domain test means something crossed a boundary it should not have.
+- **One domain change, already landed: the feed view model exposes `kinds`.** The card renders stop chips, and `FeedDate` carried only counts and totals. Added as a `group_concat(distinct ...)` on the existing aggregate — no new query, no N+1 — sorted in `toFeedDate` because group_concat order is unspecified. Tested and mutation-verified. **No further domain change is in scope**; all 192 tests must stay green.
 - `src/domain/**` imports nothing from `react`, `react-native`, or `expo-*`.
 - **Every colour must carry information.** A hue that only decorates is the slop this replaces.
 - **`theme.role.primary` (`#FF6B4A`) is the brand's alone.** No kind may use it, and it never appears as a chip fill.

@@ -48,6 +48,8 @@ export interface FeedDate {
   totalMinor: number;
   currencyCode: string;
   coverUri: string | null;
+  /** Distinct kinds on this date, sorted. The feed renders these as chips. */
+  kinds: readonly string[];
 }
 
 /**
@@ -158,6 +160,7 @@ export interface FeedDateRow {
   stopCount: number;
   totalMinor: number;
   coverUri: string | null;
+  kinds: string | null;
 }
 
 /**
@@ -177,6 +180,7 @@ export function feedDatesQuery(db: AppDatabase, scope: CoupleScope) {
       coverUri: photos.localUri,
       stopCount: sql<number>`count(${stops.id})`,
       totalMinor: sql<number>`coalesce(sum(${stops.amountMinor}), 0)`,
+      kinds: sql<string | null>`group_concat(distinct ${stops.kind})`,
     })
     .from(dates)
     .leftJoin(
@@ -209,6 +213,8 @@ export function toFeedDate(row: FeedDateRow, currencyCode: string): FeedDate {
     totalMinor: Number(row.totalMinor),
     currencyCode,
     coverUri: row.coverUri,
+    // group_concat's order is unspecified, so sort for a stable chip order.
+    kinds: row.kinds === null ? [] : row.kinds.split(',').sort(),
   };
 }
 
