@@ -1,16 +1,23 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { db } from '@/db/client';
 import { getAppDeps } from '@/session';
 import { deleteStop, stopsForDateQuery, updateStop } from '@/domain/stops/edit';
 import { formatMoney, money, parseMajorToMinor } from '@/domain/money/money';
-import type { StopKind } from '@/domain/stops/taxonomy';
+import { SUBKINDS, type StopKind } from '@/domain/stops/taxonomy';
+import { kindLabel } from '@/render/FeedCard';
 import { AmountKeypad } from '@/ui/AmountKeypad';
+import { Button } from '@/ui/Button';
+import { Card } from '@/ui/Card';
+import { isStopKind, KindIcon } from '@/ui/KindIcon';
+import { MicroLabel } from '@/ui/MicroLabel';
+import { Rule } from '@/ui/Rule';
 import { SubkindChips } from '@/ui/SubkindChips';
 import { theme } from '@/ui/theme';
+import { commit } from '@/ui/feedback';
 
 /**
  * The keypad starts EMPTY rather than seeded with the saved amount.
@@ -43,12 +50,22 @@ export default function StopEditor() {
   // we deleted it ourselves and are already navigating away.
   if (!stop) {
     if (updatedAt === undefined || leaving) {
-      return <SafeAreaView style={{ flex: 1, backgroundColor: theme.color.cream }} />;
+      return (
+        <>
+          <Stack.Screen options={{ headerShown: false }} />
+          <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground }} />
+        </>
+      );
     }
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.color.cream, justifyContent: 'center', padding: theme.space.lg }}>
-        <Text style={{ color: theme.color.ink }}>That stop is gone.</Text>
-      </SafeAreaView>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground, justifyContent: 'center', padding: theme.space.lg }}>
+          <Card>
+            <Text style={{ ...theme.type.body, color: theme.role.ink, textAlign: 'center' }}>That stop is gone.</Text>
+          </Card>
+        </SafeAreaView>
+      </>
     );
   }
 
@@ -81,6 +98,7 @@ export default function StopEditor() {
       subkind: current.subkind,
       ...amountPatch,
     });
+    commit();
     setLeaving(true);
     router.back();
   };
@@ -99,63 +117,93 @@ export default function StopEditor() {
           // deliberate delete.
           setLeaving(true);
           deleteStop(db, deps, stop.id);
+          commit();
           router.back();
         },
       },
     ]);
   };
 
+  const tint = isStopKind(stop.kind) ? theme.kind[stop.kind] : theme.kind.other;
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.color.cream }}>
-      <ScrollView contentContainerStyle={{ padding: theme.space.md, gap: theme.space.md }}>
-        <Text style={{ fontSize: 11, letterSpacing: 1, color: theme.color.muted }}>
-          {stop.kind.toUpperCase()}
-        </Text>
-
-        <Text style={{ color: theme.color.muted, textAlign: 'center' }}>
-          {current.amount === AMOUNT_UNCHANGED ? 'Type to change the amount' : 'New amount'}
-        </Text>
-
-        <AmountKeypad
-          value={current.amount}
-          onChange={(amount) => patch({ amount })}
-          currencyCode={stop.currencyCode}
-          placeholder={formatMoney(money(stop.amountMinor, stop.currencyCode))}
-        />
-
-        <SubkindChips
-          kind={stop.kind as StopKind}
-          selected={current.subkind}
-          onSelect={(subkind) => patch({ subkind })}
-        />
-
-        <TextInput
-          value={current.label}
-          onChangeText={(label) => patch({ label })}
-          placeholder="What was it?"
-          placeholderTextColor={theme.color.muted}
-          style={{ borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, padding: theme.space.md, color: theme.color.ink, backgroundColor: '#FFFFFF' }}
-        />
-
-        <TextInput
-          value={current.placeName}
-          onChangeText={(placeName) => patch({ placeName })}
-          placeholder="Where?"
-          placeholderTextColor={theme.color.muted}
-          style={{ borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, padding: theme.space.md, color: theme.color.ink, backgroundColor: '#FFFFFF' }}
-        />
-
-        <Pressable
-          onPress={save}
-          style={{ alignItems: 'center', paddingVertical: theme.space.md, borderRadius: theme.radius.md, backgroundColor: theme.color.ink }}
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: theme.space.md,
+            paddingTop: theme.space.sm,
+          }}
         >
-          <Text style={{ color: theme.color.cream, fontWeight: '700', fontSize: 16 }}>Save</Text>
-        </Pressable>
+          <Button variant="quiet" label="Back" onPress={() => router.back()} />
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: theme.space.xs,
+              paddingHorizontal: theme.space.md,
+              paddingVertical: theme.space.sm,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: tint,
+            }}
+          >
+            <KindIcon kind={stop.kind} size={14} color={tint} />
+            <Text style={{ ...theme.type.meta, fontWeight: '600', color: tint }}>{kindLabel(stop.kind)}</Text>
+          </View>
+        </View>
 
-        <Pressable onPress={confirmDelete} style={{ alignItems: 'center', paddingVertical: theme.space.sm }}>
-          <Text style={{ color: theme.color.rose, fontWeight: '600' }}>Remove stop</Text>
-        </Pressable>
-      </ScrollView>
-    </SafeAreaView>
+        <ScrollView contentContainerStyle={{ padding: theme.space.md, gap: theme.space.md }}>
+          <MicroLabel>
+            {current.amount === AMOUNT_UNCHANGED ? 'TYPE TO CHANGE AMOUNT' : 'NEW AMOUNT'}
+          </MicroLabel>
+
+          <AmountKeypad
+            value={current.amount}
+            onChange={(amount) => patch({ amount })}
+            currencyCode={stop.currencyCode}
+            placeholder={formatMoney(money(stop.amountMinor, stop.currencyCode))}
+          />
+
+          {SUBKINDS[stop.kind as StopKind]?.length > 0 && (
+            <View style={{ gap: theme.space.sm }}>
+              <MicroLabel>SUBKIND</MicroLabel>
+              <SubkindChips
+                kind={stop.kind as StopKind}
+                selected={current.subkind}
+                onSelect={(subkind) => patch({ subkind })}
+              />
+            </View>
+          )}
+
+          <Card>
+            <TextInput
+              value={current.label}
+              onChangeText={(label) => patch({ label })}
+              placeholder="What was it?"
+              placeholderTextColor={theme.role.inkMuted}
+              style={{ ...theme.type.body, color: theme.role.ink, padding: 0 }}
+            />
+            <View style={{ marginVertical: theme.space.sm }}>
+              <Rule />
+            </View>
+            <TextInput
+              value={current.placeName}
+              onChangeText={(placeName) => patch({ placeName })}
+              placeholder="Where?"
+              placeholderTextColor={theme.role.inkMuted}
+              style={{ ...theme.type.body, color: theme.role.ink, padding: 0 }}
+            />
+          </Card>
+
+          <Button label="Save" onPress={save} />
+          <Button variant="danger" label="Remove stop" onPress={confirmDelete} />
+        </ScrollView>
+      </SafeAreaView>
+    </>
   );
 }
