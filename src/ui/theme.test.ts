@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { theme } from './theme';
+import { STOP_KINDS } from '@/domain/stops/taxonomy';
 
 describe('type scale', () => {
   it('descends at every step', () => {
@@ -52,5 +53,37 @@ describe('type scale', () => {
     // in a design whose whole claim is that hierarchy comes from ratio.
     expect(theme.type.title.fontSize / theme.type.display.fontSize).toBeLessThan(0.75);
     expect(theme.type.body.fontSize / theme.type.title.fontSize).toBeLessThan(0.8);
+  });
+});
+
+describe('colour system', () => {
+  it('gives every stop kind its own colour', () => {
+    for (const kind of STOP_KINDS) {
+      expect(theme.kind[kind]).toMatch(/^#[0-9A-F]{6}$/i);
+    }
+  });
+
+  it('never lets a kind wear the brand colour', () => {
+    // primary carries actions, key numbers, the FAB and the active tab. A kind
+    // wearing it collapses "what this is" into "what you can do".
+    for (const kind of STOP_KINDS) {
+      expect(theme.kind[kind].toUpperCase()).not.toBe(theme.role.primary.toUpperCase());
+    }
+  });
+
+  it('keeps every kind colour distinct', () => {
+    const used = Object.values(theme.kind).map((hex) => hex.toUpperCase());
+    expect(new Set(used).size).toBe(used.length);
+  });
+
+  it('keeps the ground darker than the card surface', () => {
+    // On a dark UI the floor must sit BELOW the cards. The previous attempt used
+    // the brand plum as the ground, which left cards nothing to rise from.
+    const luminance = (hex: string) =>
+      Number.parseInt(hex.slice(1, 3), 16) +
+      Number.parseInt(hex.slice(3, 5), 16) +
+      Number.parseInt(hex.slice(5, 7), 16);
+
+    expect(luminance(theme.role.ground)).toBeLessThan(luminance(theme.role.surface));
   });
 });
