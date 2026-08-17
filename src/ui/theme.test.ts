@@ -25,7 +25,7 @@ describe('type scale', () => {
     // their ratio to each other carries no hierarchy, so a uniform gap rule
     // would either reject this scale or be loose enough to accept the old one.
     const ratio = theme.type.body.fontSize / theme.type.display.fontSize;
-    expect(ratio).toBeLessThanOrEqual(0.5);
+    expect(ratio).toBeLessThan(0.5);
   });
 
   it('gives every step a line height taller than its size', () => {
@@ -36,6 +36,21 @@ describe('type scale', () => {
 
   it('letterspaces micro, and only micro', () => {
     expect(theme.type.micro.letterSpacing).toBeGreaterThan(0);
-    expect(theme.type.display.letterSpacing ?? 0).toBe(0);
+    // Every OTHER step, not just display. Letterspacing is what makes micro
+    // read as a label rather than small body text; spreading it elsewhere
+    // dilutes that signal to nothing.
+    for (const [name, step] of Object.entries(theme.type)) {
+      if (name === 'micro') continue;
+      expect(step.letterSpacing).toBe(0);
+    }
+  });
+
+  it('keeps the title step distinct from both neighbours', () => {
+    // Pinning only display and body leaves the middle of a five-step scale
+    // free to collapse: title could drop to 17 against a 16 body and every
+    // other assertion here would still pass, erasing the second-largest step
+    // in a design whose whole claim is that hierarchy comes from ratio.
+    expect(theme.type.title.fontSize / theme.type.display.fontSize).toBeLessThan(0.75);
+    expect(theme.type.body.fontSize / theme.type.title.fontSize).toBeLessThan(0.8);
   });
 });
