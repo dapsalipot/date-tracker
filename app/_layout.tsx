@@ -4,6 +4,7 @@ import { Text, View } from 'react-native';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import migrations from '../drizzle/migrations';
 import { migrationDb } from '@/db/client';
+import { Card } from '@/ui/Card';
 import { theme } from '@/ui/theme';
 
 export default function RootLayout() {
@@ -12,17 +13,21 @@ export default function RootLayout() {
   if (error) {
     // A failed migration must never brick the app — surface it plainly.
     return (
-      <View style={{ flex: 1, justifyContent: 'center', padding: theme.space.lg }}>
-        <Text style={{ color: theme.color.ink, fontWeight: '700' }}>Database update failed</Text>
-        <Text style={{ color: theme.color.muted, marginTop: theme.space.sm }}>{error.message}</Text>
+      <View style={{ flex: 1, justifyContent: 'center', padding: theme.space.lg, backgroundColor: theme.role.ground }}>
+        <Card>
+          <Text style={{ ...theme.type.body, fontWeight: '700', color: theme.role.ink }}>Database update failed</Text>
+          <Text style={{ ...theme.type.meta, color: theme.role.inkMuted, marginTop: theme.space.sm }}>{error.message}</Text>
+        </Card>
       </View>
     );
   }
 
   if (!success) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: theme.color.muted }}>Preparing…</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.role.ground }}>
+        <Card>
+          <Text style={{ ...theme.type.body, color: theme.role.inkMuted }}>Preparing…</Text>
+        </Card>
       </View>
     );
   }
@@ -36,11 +41,11 @@ export default function RootLayout() {
     <SafeAreaProvider>
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: theme.color.cream },
-        headerTintColor: theme.color.ink,
+        headerStyle: { backgroundColor: theme.role.surface },
+        headerTintColor: theme.role.ink,
         headerTitleStyle: { fontWeight: '700' },
         headerShadowVisible: false,
-        contentStyle: { backgroundColor: theme.color.cream },
+        contentStyle: { backgroundColor: theme.role.ground },
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
