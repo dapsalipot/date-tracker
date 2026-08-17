@@ -4,6 +4,7 @@ import { dates, stops } from '@/db/schema';
 import { createTestDb, testDeps } from '@/test/testDb';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop } from '@/domain/dates/repository';
+import { addPerson } from '@/domain/identity/people';
 import { deleteStop, listStopsForDate, reorderStops, updateStop } from './edit';
 
 const DEPS = testDeps(1_785_000_000_000, '2026-08-03');
@@ -60,6 +61,27 @@ describe('updateStop', () => {
     expect(dateUpdatedAt()).not.toBe(before);
   });
 });
+
+  it('changes who paid', () => {
+    const { db, dateId, a, ctx } = setup();
+    const them = addPerson(db, DEPS, ctx.coupleId, 'Alex');
+
+    updateStop(db, DEPS, a, { paidByUserId: them });
+
+    const row = db.select({ paidBy: stops.paidByUserId }).from(stops).where(eq(stops.id, a)).all()[0];
+    expect(row?.paidBy).toBe(them);
+  });
+
+  it('leaves the payer alone when the patch omits it', () => {
+    const { db, a, ctx } = setup();
+
+    updateStop(db, DEPS, a, { label: 'Coffee' });
+
+    const row = db.select({ paidBy: stops.paidByUserId }).from(stops).where(eq(stops.id, a)).all()[0];
+    // captureStop attributes the stop to whoever captured it. A patch that
+    // does not mention the payer must not silently reassign the expense.
+    expect(row?.paidBy).toBe(ctx.userId);
+  });
 
 describe('deleteStop', () => {
   it('tombstones and leaves the remaining order intact', () => {

@@ -13,6 +13,7 @@ export interface StopRow {
   occurredAt: number | null;
   amountMinor: number;
   currencyCode: string;
+  paidByUserId: string | null;
 }
 
 export interface StopPatch {
@@ -20,6 +21,8 @@ export interface StopPatch {
   subkind?: string | null;
   placeName?: string | null;
   amountMinor?: number;
+  /** Who paid. Omitted leaves the existing attribution untouched. */
+  paidByUserId?: string;
 }
 
 export function stopsForDateQuery(db: AppDatabase, dateId: string) {
@@ -34,6 +37,7 @@ export function stopsForDateQuery(db: AppDatabase, dateId: string) {
       occurredAt: stops.occurredAt,
       amountMinor: stops.amountMinor,
       currencyCode: stops.currencyCode,
+      paidByUserId: stops.paidByUserId,
     })
     .from(stops)
     .where(and(eq(stops.dateId, dateId), isNull(stops.deletedAt)))
@@ -62,6 +66,7 @@ export function updateStop(db: AppDatabase, deps: Deps, stopId: string, patch: S
   if (patch.subkind !== undefined) set.subkind = patch.subkind;
   if (patch.placeName !== undefined) set.placeName = patch.placeName;
   if (patch.amountMinor !== undefined) set.amountMinor = patch.amountMinor;
+  if (patch.paidByUserId !== undefined) set.paidByUserId = patch.paidByUserId;
 
   db.transaction((tx) => {
     const owner = tx.select({ dateId: stops.dateId }).from(stops).where(eq(stops.id, stopId)).all()[0];
