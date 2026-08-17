@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { db } from '@/db/client';
@@ -10,7 +11,14 @@ import { setCoverPhoto } from '@/domain/dates/cover';
 import { attachPhoto, detachPhoto, photosForDateQuery } from '@/domain/photos/repository';
 import { persistPickedImage } from '@/media/store';
 import { getAppDeps } from '@/session';
+import { Button } from '@/ui/Button';
+import { Card } from '@/ui/Card';
+import { MicroLabel } from '@/ui/MicroLabel';
 import { theme } from '@/ui/theme';
+import { commit } from '@/ui/feedback';
+
+const PHOTO_WIDTH = 84;
+const PHOTO_HEIGHT = 105;
 
 export default function Compose() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,8 +33,12 @@ export default function Compose() {
 
   if (!detail) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.color.cream, justifyContent: 'center', padding: theme.space.lg }}>
-        <Text style={{ color: theme.color.ink }}>That date no longer exists.</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground, justifyContent: 'center', padding: theme.space.lg }}>
+        <Card>
+          <Text style={{ ...theme.type.body, color: theme.role.ink, textAlign: 'center' }}>
+            That date no longer exists.
+          </Text>
+        </Card>
       </SafeAreaView>
     );
   }
@@ -70,6 +82,7 @@ export default function Compose() {
   const chooseCover = (photoId: string | null) => {
     try {
       setCoverPhoto(db, deps, id, photoId);
+      commit();
     } catch {
       Alert.alert('Could not set cover', 'That photo is no longer part of this date.');
     }
@@ -80,6 +93,7 @@ export default function Compose() {
     if (publish) {
       try {
         publishDate(db, deps, id);
+        commit();
       } catch {
         Alert.alert('Almost there', 'Give this date a title first.');
         return;
@@ -89,86 +103,102 @@ export default function Compose() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.color.cream }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground }}>
       <ScrollView contentContainerStyle={{ padding: theme.space.md, gap: theme.space.md }}>
-        <Text style={{ fontSize: 11, letterSpacing: 1, color: theme.color.muted }}>
-          {detail.occurredOn.toUpperCase()}
-        </Text>
+        <Card>
+          <MicroLabel>{detail.occurredOn.toUpperCase()}</MicroLabel>
+          <TextInput
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Name this date"
+            placeholderTextColor={theme.role.inkMuted}
+            // The receipt shrinks and then ellipsises an over-wide title, and
+            // the exported filename is built from it. Cap it here so neither has
+            // to rescue an essay.
+            maxLength={60}
+            style={{ ...theme.type.title, color: theme.role.ink, paddingVertical: theme.space.sm }}
+          />
+        </Card>
 
-        <TextInput
-          value={title}
-          onChangeText={setTitle}
-          placeholder="Name this date"
-          placeholderTextColor={theme.color.muted}
-          // The receipt shrinks and then ellipsises an over-wide title, and
-          // the exported filename is built from it. Cap it here so neither has
-          // to rescue an essay.
-          maxLength={60}
-          style={{ fontSize: 24, fontWeight: '700', color: theme.color.ink, paddingVertical: theme.space.sm }}
-        />
+        <Card>
+          <MicroLabel>PHOTOS</MicroLabel>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: theme.space.sm, marginTop: theme.space.sm }}
+          >
+            {photos.map((photo) => {
+              const isCover = photo.id === coverPhotoId;
+              return (
+                <Pressable
+                  key={photo.id}
+                  onPress={() => chooseCover(isCover ? null : photo.id)}
+                  onLongPress={() =>
+                    Alert.alert('Remove this photo?', 'It disappears from this date.', [
+                      { text: 'Keep', style: 'cancel' },
+                      { text: 'Remove', style: 'destructive', onPress: () => detachPhoto(db, deps, photo.id) },
+                    ])
+                  }
+                  style={{
+                    width: PHOTO_WIDTH,
+                    height: PHOTO_HEIGHT,
+                    borderRadius: theme.radius.md,
+                    overflow: 'hidden',
+                    borderWidth: isCover ? 2 : 1,
+                    borderColor: isCover ? theme.role.primary : theme.role.line,
+                  }}
+                >
+                  {photo.localUri !== null && (
+                    <Image source={{ uri: photo.localUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  )}
+                  {isCover && (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: 4,
+                        right: 4,
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        backgroundColor: theme.role.primary,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Ionicons name="star" size={12} color={theme.role.onPrimary} />
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
 
-
-
-        <Text style={{ fontSize: 11, letterSpacing: 1, color: theme.color.muted, marginTop: theme.space.md }}>
-          PHOTOS
-        </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: theme.space.sm, paddingVertical: theme.space.sm }}>
-          {photos.map((photo) => {
-            const isCover = photo.id === coverPhotoId;
-            return (
-              <Pressable
-                key={photo.id}
-                onPress={() => chooseCover(isCover ? null : photo.id)}
-                onLongPress={() =>
-                  Alert.alert('Remove this photo?', 'It disappears from this date.', [
-                    { text: 'Keep', style: 'cancel' },
-                    { text: 'Remove', style: 'destructive', onPress: () => detachPhoto(db, deps, photo.id) },
-                  ])
-                }
+            <Card padded={false} onPress={() => { void addPhoto(); }}>
+              <View
                 style={{
-                  width: 84, height: 105, borderRadius: theme.radius.md, overflow: 'hidden',
-                  borderWidth: isCover ? 3 : 1,
-                  borderColor: isCover ? theme.color.rose : theme.color.line,
+                  width: PHOTO_WIDTH,
+                  height: PHOTO_HEIGHT,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: adding ? 0.4 : 1,
                 }}
               >
-                {photo.localUri !== null && (
-                  <Image source={{ uri: photo.localUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                )}
-              </Pressable>
-            );
-          })}
-
-          <Pressable
-            onPress={addPhoto}
-            disabled={adding}
-            style={{
-              width: 84, height: 105, borderRadius: theme.radius.md,
-              borderWidth: 1, borderColor: theme.color.line, borderStyle: 'dashed',
-              alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.blush,
-              opacity: adding ? 0.4 : 1,
-            }}
-          >
-            <Text style={{ fontSize: 24, color: theme.color.muted }}>+</Text>
-          </Pressable>
-        </ScrollView>
-        <Text style={{ color: theme.color.muted, fontSize: 12 }}>
-          Tap to set the cover · hold to remove
-        </Text>
+                <Ionicons name="images-outline" size={24} color={theme.role.inkMuted} />
+              </View>
+            </Card>
+          </ScrollView>
+          <Text style={{ ...theme.type.meta, color: theme.role.inkMuted, marginTop: theme.space.sm }}>
+            Tap to set the cover · hold to remove
+          </Text>
+        </Card>
       </ScrollView>
 
       <View style={{ flexDirection: 'row', gap: theme.space.sm, padding: theme.space.md }}>
-        <Pressable
-          onPress={() => save(false)}
-          style={{ flex: 1, alignItems: 'center', paddingVertical: theme.space.md, borderRadius: theme.radius.md, backgroundColor: theme.color.blush }}
-        >
-          <Text style={{ color: theme.color.ink, fontWeight: '700' }}>Save draft</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => save(true)}
-          style={{ flex: 1, alignItems: 'center', paddingVertical: theme.space.md, borderRadius: theme.radius.md, backgroundColor: theme.color.ink }}
-        >
-          <Text style={{ color: theme.color.cream, fontWeight: '700' }}>Publish</Text>
-        </Pressable>
+        <View style={{ flex: 1 }}>
+          <Button variant="quiet" label="Save draft" onPress={() => save(false)} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button label="Publish" onPress={() => save(true)} />
+        </View>
       </View>
     </SafeAreaView>
   );
