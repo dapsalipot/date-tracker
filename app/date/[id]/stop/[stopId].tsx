@@ -4,8 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { db } from '@/db/client';
-import { getAppDeps } from '@/session';
+import { getAppDeps, getLocalContext } from '@/session';
 import { deleteStop, stopsForDateQuery, updateStop } from '@/domain/stops/edit';
+import { addPerson, listPeople } from '@/domain/identity/people';
 import { formatMoney, money, parseMajorToMinor } from '@/domain/money/money';
 import { SUBKINDS, type StopKind } from '@/domain/stops/taxonomy';
 import { kindLabel } from '@/render/FeedCard';
@@ -14,6 +15,7 @@ import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { isStopKind, KindIcon } from '@/ui/KindIcon';
 import { MicroLabel } from '@/ui/MicroLabel';
+import { PayerPicker } from '@/ui/PayerPicker';
 import { Rule } from '@/ui/Rule';
 import { SubkindChips } from '@/ui/SubkindChips';
 import { theme } from '@/ui/theme';
@@ -37,11 +39,13 @@ const AMOUNT_UNCHANGED = '';
 export default function StopEditor() {
   const { id, stopId } = useLocalSearchParams<{ id: string; stopId: string }>();
   const deps = getAppDeps();
+  const ctx = getLocalContext();
   const { data: stops, updatedAt } = useLiveQuery(stopsForDateQuery(db, id), [id]);
   const stop = stops.find((s) => s.id === stopId) ?? null;
 
+  const [people, setPeople] = useState(() => listPeople(db, ctx.coupleId));
   const [draft, setDraft] = useState<{
-    label: string; placeName: string; subkind: string | null; amount: string;
+    label: string; placeName: string; subkind: string | null; amount: string; paidByUserId: string | null;
   } | null>(null);
   const [leaving, setLeaving] = useState(false);
 
@@ -76,6 +80,7 @@ export default function StopEditor() {
     placeName: stop.placeName ?? '',
     subkind: stop.subkind,
     amount: AMOUNT_UNCHANGED,
+    paidByUserId: stop.paidByUserId,
   };
   const patch = (next: Partial<typeof current>) => setDraft({ ...current, ...next });
 
@@ -97,6 +102,9 @@ export default function StopEditor() {
       placeName: current.placeName.trim() === '' ? null : current.placeName.trim(),
       subkind: current.subkind,
       ...amountPatch,
+      // paidByUserId has no "clear" state in the patch — omitted leaves the
+      // existing attribution untouched, which matches an unset picker.
+      ...(current.paidByUserId ? { paidByUserId: current.paidByUserId } : {}),
     });
     commit();
     setLeaving(true);
@@ -179,6 +187,20 @@ export default function StopEditor() {
               />
             </View>
           )}
+
+          <View style={{ gap: theme.space.sm }}>
+            <MicroLabel>WHO PAID</MicroLabel>
+            <PayerPicker
+              people={people}
+              selected={current.paidByUserId}
+              onSelect={(paidByUserId) => patch({ paidByUserId })}
+              onAdd={(displayName) => {
+                const personId = addPerson(db, deps, ctx.coupleId, displayName);
+                setPeople(listPeople(db, ctx.coupleId));
+                return personId;
+              }}
+            />
+          </View>
 
           <Card>
             <TextInput
