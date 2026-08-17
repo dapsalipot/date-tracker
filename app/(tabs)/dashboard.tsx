@@ -12,9 +12,9 @@ import { topPlaces } from '@/domain/analytics/places';
 import { formatMoney, money } from '@/domain/money/money';
 import { Bar } from '@/ui/Bar';
 import { Card } from '@/ui/Card';
+import { isStopKind } from '@/ui/KindIcon';
 import { MicroLabel } from '@/ui/MicroLabel';
 import { Screen } from '@/ui/Screen';
-import { STOP_KINDS, type StopKind } from '@/domain/stops/taxonomy';
 import { theme } from '@/ui/theme';
 
 const TREND_MONTHS = 12;
@@ -37,10 +37,6 @@ function formatPeriodMonth(periodMonth: string): string {
 }
 
 const muted = { ...theme.type.meta, color: theme.role.inkMuted } as const;
-
-function isStopKind(value: string): value is StopKind {
-  return (STOP_KINDS as readonly string[]).includes(value);
-}
 
 /** Bars are the one place a kind colour fills rather than outlines. */
 function kindTint(kind: string): string {
