@@ -3,7 +3,8 @@ import { eq } from 'drizzle-orm';
 import { createTestDb, testDeps } from '@/test/testDb';
 import { coupleMembers, users } from '@/db/schema';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
-import { addPerson, listPeople, renamePerson } from './people';
+import { captureStop } from '@/domain/dates/repository';
+import { addPerson, lastPayerId, listPeople, renamePerson } from './people';
 
 const DEPS = testDeps(1_786_000_000_000, '2026-08-18', 'ppl');
 
@@ -106,5 +107,37 @@ describe('renamePerson', () => {
     const { db, ctx } = setup();
 
     expect(() => renamePerson(db, DEPS, ctx.userId, '  ')).toThrow(/name/i);
+  });
+});
+
+describe('lastPayerId', () => {
+  it('returns whoever paid most recently', () => {
+    const { db, ctx } = setup();
+    const them = addPerson(db, DEPS, ctx.coupleId, 'Alex');
+    captureStop(db, testDeps(1_786_000_000_000, '2026-08-18', 'c1'), {
+      coupleId: ctx.coupleId, userId: ctx.userId, kind: 'food', amountMinor: 100, currencyCode: 'PHP',
+    });
+    captureStop(db, testDeps(1_786_900_000_000, '2026-08-19', 'c2'), {
+      coupleId: ctx.coupleId, userId: them, kind: 'food', amountMinor: 200, currencyCode: 'PHP',
+    });
+
+    expect(lastPayerId(db, ctx.coupleId)).toBe(them);
+  });
+
+  it('returns null when nothing has been captured', () => {
+    const { db, ctx } = setup();
+
+    // The screen falls back to the local user; a wrong guess here would
+    // silently attribute the first expense of a couple's history.
+    expect(lastPayerId(db, ctx.coupleId)).toBeNull();
+  });
+
+  it("ignores another couple's stops", () => {
+    const { db, ctx } = setup();
+    captureStop(db, DEPS, {
+      coupleId: 'them', userId: 'stranger', kind: 'food', amountMinor: 100, currencyCode: 'PHP',
+    });
+
+    expect(lastPayerId(db, ctx.coupleId)).toBeNull();
   });
 });

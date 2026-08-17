@@ -1,5 +1,5 @@
-import { and, asc, eq, isNull } from 'drizzle-orm';
-import { coupleMembers, users } from '@/db/schema';
+import { and, asc, desc, eq, isNotNull, isNull } from 'drizzle-orm';
+import { coupleMembers, dates, stops, users } from '@/db/schema';
 import type { AppDatabase } from '@/db/types';
 import type { Deps } from '@/domain/deps';
 
@@ -76,4 +76,32 @@ export function renamePerson(
     .set({ displayName: name, updatedAt: deps.clock.nowMs() })
     .where(eq(users.id, userId))
     .run();
+}
+
+/**
+ * Whoever paid most recently, or null if this couple has captured nothing.
+ *
+ * The capture sheet defaults its payer to this so the common case stays one
+ * tap — the five-second target does not survive a required choice on every
+ * capture. Null is returned rather than guessing, so the caller decides what
+ * an empty history means.
+ */
+export function lastPayerId(db: AppDatabase, coupleId: string): string | null {
+  const rows = db
+    .select({ paidByUserId: stops.paidByUserId })
+    .from(stops)
+    .innerJoin(dates, eq(dates.id, stops.dateId))
+    .where(
+      and(
+        eq(dates.coupleId, coupleId),
+        isNull(dates.deletedAt),
+        isNull(stops.deletedAt),
+        isNotNull(stops.paidByUserId),
+      ),
+    )
+    .orderBy(desc(stops.occurredAt))
+    .limit(1)
+    .all();
+
+  return rows[0]?.paidByUserId ?? null;
 }
