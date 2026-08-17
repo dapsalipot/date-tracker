@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { router } from 'expo-router';
 import { db } from '@/db/client';
@@ -11,7 +10,11 @@ import { formatMoney, money } from '@/domain/money/money';
 import { FeedCard } from '@/render/FeedCard';
 import { seedTwelveMonths } from '@/fixtures/seed';
 import { getAppDeps, getLocalContext } from '@/session';
+import { MicroLabel } from '@/ui/MicroLabel';
+import { Rule } from '@/ui/Rule';
+import { Screen } from '@/ui/Screen';
 import { theme } from '@/ui/theme';
+import { tap } from '@/ui/feedback';
 
 export default function Feed() {
   const ctx = getLocalContext();
@@ -39,42 +42,71 @@ export default function Feed() {
       : `${formatMoney(money(budget.remainingMinor, ctx.currencyCode))} left · ${budget.daysLeft}d`;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.color.cream }}>
-      <View style={{ padding: theme.space.md }}>
-        <Text style={{ fontSize: 28, fontWeight: '800', color: theme.color.ink }}>Our dates</Text>
-        <Text style={{ color: budget.isOverBudget ? theme.color.rose : theme.color.muted, marginTop: 4 }}>
+    <Screen>
+      <View style={{ paddingTop: theme.space.sm }}>
+        <MicroLabel>OUR DATES</MicroLabel>
+        <Text
+          style={{
+            ...theme.type.meta,
+            color: budget.isOverBudget ? theme.role.accent : theme.role.inkMuted,
+            marginTop: theme.space.xs,
+          }}
+        >
           {remaining}
         </Text>
       </View>
 
       {drafts.length > 0 && (
-        <Pressable
-          onPress={() => router.push(`/date/${drafts[0]?.id}/compose`)}
-          style={{ marginHorizontal: theme.space.md, marginBottom: theme.space.sm, padding: theme.space.md, borderRadius: theme.radius.md, backgroundColor: theme.color.blush, flexDirection: 'row', justifyContent: 'space-between' }}
-        >
-          <Text style={{ fontWeight: '700', color: theme.color.ink }}>
-            {drafts.length === 1 ? '1 date waiting' : `${drafts.length} dates waiting`}
-          </Text>
-          <Text style={{ color: theme.color.rose, fontWeight: '700' }}>Finish →</Text>
-        </Pressable>
+        <View style={{ marginTop: theme.space.md }}>
+          <Rule />
+          <Pressable
+            onPress={() => router.push(`/date/${drafts[0]?.id}/compose`)}
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingVertical: theme.space.sm,
+            }}
+          >
+            <MicroLabel>
+              {drafts.length === 1 ? '1 DATE WAITING' : `${drafts.length} DATES WAITING`}
+            </MicroLabel>
+            <Text style={{ ...theme.type.meta, color: theme.role.accent }}>Finish</Text>
+          </Pressable>
+          <Rule />
+        </View>
       )}
 
+      {/*
+        The Screen body carries paddingHorizontal: theme.screenMargin, which
+        would otherwise inset the FlatList and cap FeedCard's photo short of
+        the true edge. Cancelling it here with an equal negative margin lets
+        the list reach the screen edges again; FeedCard's own text block then
+        reapplies theme.screenMargin so its type lines up with the header
+        above, while its image has no such padding and bleeds full width.
+      */}
       <FlatList
         data={published}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingHorizontal: theme.space.md, paddingBottom: theme.space.lg }}
+        style={{ marginHorizontal: -theme.screenMargin }}
+        contentContainerStyle={{ paddingBottom: theme.space.xxl }}
+        ItemSeparatorComponent={Rule}
         ListEmptyComponent={
           drafts.length === 0 && published.length === 0 ? (
             <Pressable
               onPress={() => seedTwelveMonths(db, ctx.coupleId, ctx.userId, deps.clock.todayLocal(), deps)}
               style={{
+                marginHorizontal: theme.screenMargin,
+                marginTop: theme.space.lg,
                 padding: theme.space.lg,
                 borderRadius: theme.radius.md,
-                backgroundColor: theme.color.blush,
+                backgroundColor: theme.role.accentQuiet,
                 alignItems: 'center',
               }}
             >
-              <Text style={{ color: theme.color.ink, fontWeight: '700' }}>Seed 12 months of demo dates</Text>
+              <Text style={{ ...theme.type.body, fontWeight: '600', color: theme.role.ink }}>
+                Seed 12 months of demo dates
+              </Text>
             </Pressable>
           ) : null
         }
@@ -84,11 +116,21 @@ export default function Feed() {
       />
 
       <Pressable
-        onPress={() => router.push('/capture')}
-        style={{ position: 'absolute', right: theme.space.lg, bottom: theme.space.lg, width: 60, height: 60, borderRadius: 30, backgroundColor: theme.color.ink, alignItems: 'center', justifyContent: 'center' }}
+        onPress={() => { tap(); router.push('/capture'); }}
+        style={{
+          position: 'absolute',
+          right: theme.space.lg,
+          bottom: theme.space.lg,
+          width: 60,
+          height: 60,
+          borderRadius: theme.radius.lg,
+          backgroundColor: theme.role.ink,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
       >
-        <Text style={{ color: theme.color.cream, fontSize: 30, lineHeight: 34 }}>+</Text>
+        <Text style={{ ...theme.type.display, color: theme.role.ground }}>+</Text>
       </Pressable>
-    </SafeAreaView>
+    </Screen>
   );
 }
