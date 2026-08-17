@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/ui/theme';
 
 /**
@@ -8,8 +8,9 @@ import { theme } from '@/ui/theme';
  * screen with no way out. Both screens draw their own heading anyway — the
  * feed its "Our dates" title, the dashboard its month stepper.
  *
- * Text icons rather than an icon package: two glyphs do not justify a
- * dependency.
+ * Filled glyph when focused, outline when not — `tabBarActiveTintColor`
+ * already colours the active tab `role.primary`, so the shape change is what
+ * carries the state at a glance rather than colour alone.
  */
 export default function TabsLayout() {
   return (
@@ -26,14 +27,18 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Dates',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>♥</Text>,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'heart' : 'heart-outline'} size={20} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="dashboard"
         options={{
           title: 'Spending',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>▤</Text>,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'stats-chart' : 'stats-chart-outline'} size={20} color={color} />
+          ),
         }}
       />
     </Tabs>
