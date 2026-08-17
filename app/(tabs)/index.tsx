@@ -5,7 +5,6 @@ import { router } from 'expo-router';
 import { db } from '@/db/client';
 import { toFeedDate } from '@/domain/dates/repository';
 import { draftDatesQuery, publishedDatesQuery } from '@/domain/dates/drafts';
-import { computeBudgetStatus } from '@/domain/budget/status';
 import { formatMoney, money } from '@/domain/money/money';
 import { FeedCard } from '@/render/FeedCard';
 import { seedTwelveMonths } from '@/fixtures/seed';
@@ -15,17 +14,6 @@ import { MicroLabel } from '@/ui/MicroLabel';
 import { Screen } from '@/ui/Screen';
 import { theme } from '@/ui/theme';
 import { tap } from '@/ui/feedback';
-
-const MONTHS = [
-  'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
-  'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
-];
-
-/** "2026-08" -> "AUGUST 2026". Same slice-not-Date approach as FeedCard. */
-function monthLabel(periodMonth: string): string {
-  const monthIndex = Number.parseInt(periodMonth.slice(5, 7), 10) - 1;
-  return `${MONTHS[monthIndex] ?? ''} ${periodMonth.slice(0, 4)}`;
-}
 
 export default function Feed() {
   const ctx = getLocalContext();
@@ -43,33 +31,36 @@ export default function Feed() {
     [publishedRows, ctx.currencyCode],
   );
 
-  // Budget spans two queries, so it cannot be a single live query. Recomputing
-  // it when either list changes is sufficient: every stop write changes one.
-  const budget = useMemo(() => computeBudgetStatus(db, ctx, deps), [ctx, deps, draftRows, publishedRows]);
-
-  // The headline is the number alone; "left to spend" and the day count are
-  // separate, smaller lines. Cramming them into one display-size string made
-  // the whole header read as one shouted sentence.
-  const headlineAmount =
-    budget.remainingMinor === null
-      ? 'No budget set'
-      : formatMoney(money(budget.remainingMinor, ctx.currencyCode));
-
-  const spentFraction =
-    budget.budgetMinor === null || budget.budgetMinor === 0
-      ? 0
-      : Math.max(0, Math.min(1, budget.spentMinor / budget.budgetMinor));
+  // What is captured but not yet finished into a date. The feed answers "what
+  // have I logged that still needs me"; the dashboard owns the budget.
+  const queued = useMemo(
+    () =>
+      drafts.reduce(
+        (acc, d) => ({ totalMinor: acc.totalMinor + d.totalMinor, stops: acc.stops + d.stopCount }),
+        { totalMinor: 0, stops: 0 },
+      ),
+    [drafts],
+  );
 
   return (
     <Screen>
       {/*
-        A drawer that hangs from the top of the screen: square top corners so it
-        reads as attached to the edge, rounded bottom so it reads as a card.
-        Nothing sits loose on the ground — a number floating on the background
-        looks like debug output, not a header.
+        A drawer hanging from the top edge: what has been captured but not yet
+        finished into a date. Tapping it opens the oldest draft — the
+        longest-neglected one is the one worth nudging hardest.
+
+        The budget lives on the Spending tab. This screen answers "what have I
+        logged that still needs me", which is a different question.
       */}
       <View style={{ marginHorizontal: -theme.screenMargin, marginBottom: theme.space.md }}>
-        <View
+        <Pressable
+          onPress={() => {
+            const oldest = drafts[0];
+            if (oldest === undefined) return;
+            tap();
+            router.push(`/date/${oldest.id}/compose`);
+          }}
+          disabled={drafts.length === 0}
           style={{
             backgroundColor: theme.role.surface,
             borderBottomLeftRadius: theme.radius.lg,
@@ -80,55 +71,30 @@ export default function Feed() {
           }}
         >
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <MicroLabel>{monthLabel(budget.periodMonth)}</MicroLabel>
-            {budget.budgetMinor !== null && (
-              <Text style={{ ...theme.type.meta, color: theme.role.inkMuted }}>
-                {budget.daysLeft}d left
-              </Text>
-            )}
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.space.sm, marginTop: theme.space.xs }}>
-            <Text style={{ ...theme.type.display, color: theme.role.primary }}>{headlineAmount}</Text>
-            {budget.budgetMinor !== null && (
-              <Text style={{ ...theme.type.meta, color: theme.role.inkMuted }}>left to spend</Text>
-            )}
-          </View>
-
-          {budget.budgetMinor !== null && (
-            <View
-              style={{
-                height: 6,
-                borderRadius: theme.radius.sm,
-                backgroundColor: theme.role.line,
-                marginTop: theme.space.sm,
-                overflow: 'hidden',
-              }}
-            >
-              <View
-                style={{
-                  width: `${spentFraction * 100}%`,
-                  height: '100%',
-                  backgroundColor: budget.isOverBudget ? theme.role.primary : theme.role.ink,
-                }}
-              />
-            </View>
-          )}
-        </View>
-      </View>
-
-      {drafts.length > 0 && (
-        <View style={{ marginTop: theme.space.md, marginBottom: theme.space.md }}>
-          <Card onPress={() => router.push(`/date/${drafts[0]?.id}/compose`)}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <MicroLabel>
-                {drafts.length === 1 ? '1 DATE WAITING' : `${drafts.length} DATES WAITING`}
-              </MicroLabel>
+            <MicroLabel>NOT SAVED YET</MicroLabel>
+            {drafts.length > 0 && (
               <Text style={{ ...theme.type.meta, color: theme.role.primary }}>Finish</Text>
-            </View>
-          </Card>
-        </View>
-      )}
+            )}
+          </View>
+
+          {drafts.length === 0 ? (
+            <Text style={{ ...theme.type.title, color: theme.role.inkMuted, marginTop: theme.space.xs }}>
+              Nothing waiting
+            </Text>
+          ) : (
+            <>
+              <Text style={{ ...theme.type.display, color: theme.role.primary, marginTop: theme.space.xs }}>
+                {formatMoney(money(queued.totalMinor, ctx.currencyCode))}
+              </Text>
+              <Text style={{ ...theme.type.meta, color: theme.role.inkMuted, marginTop: theme.space.xs }}>
+                {queued.stops === 1 ? '1 stop' : `${queued.stops} stops`}
+                {' · '}
+                {drafts.length === 1 ? '1 date' : `${drafts.length} dates`}
+              </Text>
+            </>
+          )}
+        </Pressable>
+      </View>
 
       <FlatList
         data={published}
