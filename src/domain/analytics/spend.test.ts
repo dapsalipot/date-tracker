@@ -55,6 +55,16 @@ describe('spendByKind', () => {
     expect(spendByKind(db, scope, AUG)[0]?.totalMinor).toBe(30000);
   });
 
+  it('counts only the selected month when spend comes after it', () => {
+    const { db, ctx, scope } = setup();
+    spend(db, ctx, 'food', 30000, '2026-08-01', 'a');
+    spend(db, ctx, 'food', 99000, '2026-09-15', 'future');
+
+    // The existing month test put its decoy BEFORE the target, so the upper
+    // bound of the shared predicate was guarded by nothing.
+    expect(spendByKind(db, scope, AUG)[0]?.totalMinor).toBe(30000);
+  });
+
   it('excludes tombstoned stops and tombstoned dates', () => {
     const { db, ctx, scope } = setup();
     const kept = spend(db, ctx, 'food', 30000, '2026-08-01', 'a');

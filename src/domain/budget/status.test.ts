@@ -3,7 +3,7 @@ import { createTestDb, testDeps } from '@/test/testDb';
 import { eq } from 'drizzle-orm';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop } from '@/domain/dates/repository';
-import { stops } from '@/db/schema';
+import { couples, dates, stops } from '@/db/schema';
 import { budgetStatusFor, computeBudgetStatus, setBudget } from './status';
 
 const AUG_30 = testDeps(1_787_000_000_000, '2026-08-30', 'aug30');
@@ -14,6 +14,47 @@ function setup() {
   const ctx = ensureLocalContext(db, AUG_30);
   return { db, ...ctx };
 }
+
+describe('budget scoping', () => {
+  it('drops a tombstoned date from the month total', () => {
+    const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+    const kept = captureStop(db, AUG_30, {
+      coupleId, userId, kind: 'food', amountMinor: 30000, currencyCode: 'PHP',
+    });
+    const dead = captureStop(db, testDeps(1_786_900_000_000, '2026-08-29', 'dead'), {
+      coupleId, userId, kind: 'food', amountMinor: 70000, currencyCode: 'PHP',
+    });
+    db.update(dates).set({ deletedAt: 1 }).where(eq(dates.id, dead.dateId)).run();
+
+    // Section 1 of the dashboard sits 40pt above section 2. If they disagree
+    // about the same month because one of them missed a tombstone, the screen
+    // contradicts itself and nothing in the suite notices.
+    expect(budgetStatusFor(db, scope, '2026-08', '2026-08-30').spentMinor).toBe(30000);
+    expect(kept.dateId).toBeDefined();
+  });
+
+  it("ignores another couple's spending", () => {
+    const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+    captureStop(db, AUG_30, {
+      coupleId, userId, kind: 'food', amountMinor: 30000, currencyCode: 'PHP',
+    });
+    db.insert(couples).values({
+      id: 'them', currencyCode: 'PHP', timezone: 'Asia/Manila', createdAt: 1, updatedAt: 1,
+    }).run();
+    db.insert(dates).values({
+      id: 'their-date', coupleId: 'them', occurredOn: '2026-08-10', status: 'published',
+      createdBy: userId, updatedAt: 1,
+    }).run();
+    db.insert(stops).values({
+      id: 'their-stop', dateId: 'their-date', sortOrder: 0, kind: 'food',
+      amountMinor: 500000, currencyCode: 'PHP', updatedAt: 1,
+    }).run();
+
+    expect(budgetStatusFor(db, scope, '2026-08', '2026-08-30').spentMinor).toBe(30000);
+  });
+});
 
 describe('computeBudgetStatus', () => {
   it('reports null budget when none is set', () => {

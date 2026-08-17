@@ -3,6 +3,7 @@ import { budgets, dates, stops } from '@/db/schema';
 import type { AppDatabase } from '@/db/types';
 import type { Deps } from '@/domain/deps';
 import type { CoupleScope } from '@/domain/scope';
+import { monthScope } from '@/domain/analytics/scope';
 import { daysRemainingIn, periodMonthFor } from './period';
 
 export interface BudgetStatus {
@@ -63,15 +64,10 @@ export function budgetStatusFor(
     .select({ total: sql<number>`coalesce(sum(${stops.amountMinor}), 0)` })
     .from(stops)
     .innerJoin(dates, eq(stops.dateId, dates.id))
-    .where(
-      and(
-        eq(dates.coupleId, scope.coupleId),
-        eq(stops.currencyCode, scope.currencyCode),
-        isNull(dates.deletedAt),
-        isNull(stops.deletedAt),
-        sql`substr(${dates.occurredOn}, 1, 7) = ${periodMonth}`,
-      ),
-    )
+    // Section 1 of the dashboard shares the analytics scoping rather than
+    // hand-writing it a fourth time. Every hand-written copy on this project
+    // has turned out unguarded.
+    .where(monthScope(scope, periodMonth))
     .all();
 
   const spentMinor = Number(spentRows[0]?.total ?? 0);

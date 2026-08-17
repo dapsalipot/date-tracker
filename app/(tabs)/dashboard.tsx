@@ -159,7 +159,17 @@ export default function Dashboard() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: theme.space.md, paddingTop: 0, gap: theme.space.lg }}>
+      {/*
+        flex: 1 is load-bearing. React Native defaults flexShrink to 0, so a
+        ScrollView with no flex is sized by its content: once the fixed block
+        above plus this content exceed the viewport, its frame runs past the
+        screen edge, gets clipped, and has nothing left to scroll — sections 4
+        and 5 become unreachable on a smaller phone or at large text sizes.
+      */}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: theme.space.md, paddingTop: 0, gap: theme.space.lg }}
+      >
         {/* Section 3 — trend */}
         <View style={{ gap: theme.space.sm }}>
           <Text style={sectionHeader}>TREND</Text>

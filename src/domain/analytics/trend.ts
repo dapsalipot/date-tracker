@@ -39,7 +39,7 @@ export function monthlyTrend(
       total: sql<number>`sum(${stops.amountMinor})`,
     })
     .from(stops)
-    .innerJoin(dates, and(eq(dates.id, stops.dateId), isNull(dates.deletedAt)))
+    .innerJoin(dates, eq(dates.id, stops.dateId))
     .where(monthRangeScope(scope, first, last))
     .groupBy(sql`substr(${dates.occurredOn}, 1, 7)`)
     .all();
@@ -65,7 +65,7 @@ function aggregateSpend(db: AppDatabase, wherePredicate: ReturnType<typeof month
       dateCount: sql<number>`count(distinct ${dates.id})`,
     })
     .from(stops)
-    .innerJoin(dates, and(eq(dates.id, stops.dateId), isNull(dates.deletedAt)))
+    .innerJoin(dates, eq(dates.id, stops.dateId))
     .where(wherePredicate)
     .all()[0];
   return { totalMinor: Number(row?.total ?? 0), dateCount: Number(row?.dateCount ?? 0) };

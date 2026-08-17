@@ -22,8 +22,6 @@ export default function Compose() {
   const [adding, setAdding] = useState(false);
 
   const [title, setTitle] = useState(detail?.title ?? '');
-  const [caption, setCaption] = useState(detail?.caption ?? '');
-  const [rating, setRating] = useState(detail?.rating ?? 0);
 
   if (!detail) {
     return (
@@ -78,7 +76,7 @@ export default function Compose() {
   };
 
   const save = (publish: boolean) => {
-    updateDateDetails(db, deps, id, { title: title.trim(), caption, rating: rating === 0 ? null : rating });
+    updateDateDetails(db, deps, id, { title: title.trim() });
     if (publish) {
       try {
         publishDate(db, deps, id);
@@ -109,22 +107,7 @@ export default function Compose() {
           style={{ fontSize: 24, fontWeight: '700', color: theme.color.ink, paddingVertical: theme.space.sm }}
         />
 
-        <TextInput
-          value={caption}
-          onChangeText={setCaption}
-          placeholder="How was it?"
-          placeholderTextColor={theme.color.muted}
-          multiline
-          style={{ minHeight: 90, fontSize: 16, color: theme.color.ink, backgroundColor: '#FFFFFF', borderRadius: theme.radius.md, padding: theme.space.md, borderWidth: 1, borderColor: theme.color.line }}
-        />
 
-        <View style={{ flexDirection: 'row', gap: theme.space.sm }}>
-          {[1, 2, 3, 4, 5].map((n) => (
-            <Pressable key={n} onPress={() => setRating(n === rating ? 0 : n)}>
-              <Text style={{ fontSize: 30 }}>{n <= rating ? '♥' : '♡'}</Text>
-            </Pressable>
-          ))}
-        </View>
 
         <Text style={{ fontSize: 11, letterSpacing: 1, color: theme.color.muted, marginTop: theme.space.md }}>
           PHOTOS

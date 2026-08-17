@@ -19,6 +19,12 @@ export function monthRangeScope(scope: CoupleScope, fromMonth: string, toMonth: 
     eq(dates.coupleId, scope.coupleId),
     eq(stops.currencyCode, scope.currencyCode),
     isNull(stops.deletedAt),
+    // The date-tombstone check lives here too, not in each caller's ON clause.
+    // Every query joins `dates` with an innerJoin, where ON and WHERE are
+    // equivalent — and hand-copied into six ON clauses it was unguarded in five
+    // of them, so deleting a date left its spend in the trend, the average, top
+    // places and the budget bar while "where it went" correctly dropped it.
+    isNull(dates.deletedAt),
     // Attribution follows the parent date's local day, never the stop's own
     // timestamp — a date past midnight counts entirely in one month.
     sql`substr(${dates.occurredOn}, 1, 7) >= ${fromMonth}`,

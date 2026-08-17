@@ -20,7 +20,7 @@ export function spendByKind(db: AppDatabase, scope: CoupleScope, periodMonth: st
   return db
     .select({ kind: stops.kind, total: totalExpr, stops: countExpr })
     .from(stops)
-    .innerJoin(dates, and(eq(dates.id, stops.dateId), isNull(dates.deletedAt)))
+    .innerJoin(dates, eq(dates.id, stops.dateId))
     .where(monthScope(scope, periodMonth))
     .groupBy(stops.kind)
     .orderBy(desc(totalExpr))
@@ -45,7 +45,7 @@ export function spendBySubkind(
       stops: countExpr,
     })
     .from(stops)
-    .innerJoin(dates, and(eq(dates.id, stops.dateId), isNull(dates.deletedAt)))
+    .innerJoin(dates, eq(dates.id, stops.dateId))
     .where(and(monthScope(scope, periodMonth), eq(stops.kind, kind)))
     .groupBy(sql`coalesce(${stops.subkind}, ${UNSORTED_SUBKIND})`)
     .orderBy(desc(totalExpr))

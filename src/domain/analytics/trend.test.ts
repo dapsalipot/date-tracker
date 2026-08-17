@@ -74,6 +74,25 @@ describe('monthlyTrend', () => {
     expect(monthlyTrend(db, scope, '2026-08', 1)[0]?.totalMinor).toBe(30000);
   });
 
+  it('excludes a tombstoned date', () => {
+    const { db, ctx, scope } = setup();
+    const dead = spend(db, ctx, 'food', 70000, '2026-08-02', 'x');
+    spend(db, ctx, 'food', 30000, '2026-08-01', 'a');
+    db.update(dates).set({ deletedAt: 1 }).where(eq(dates.id, dead.dateId)).run();
+
+    expect(monthlyTrend(db, scope, '2026-08', 1)[0]?.totalMinor).toBe(30000);
+  });
+
+  it('excludes spend newer than the window', () => {
+    const { db, ctx, scope } = setup();
+    spend(db, ctx, 'food', 30000, '2026-08-01', 'a');
+    spend(db, ctx, 'food', 99000, '2026-09-01', 'future');
+
+    // The upper month bound is load-bearing for every non-densified caller;
+    // no test put spend AFTER the selected window until this one.
+    expect(monthlyTrend(db, scope, '2026-08', 1)[0]?.totalMinor).toBe(30000);
+  });
+
   it('excludes spend older than the window', () => {
     const { db, ctx, scope } = setup();
     spend(db, ctx, 'food', 99000, '2025-01-05', 'old');

@@ -37,7 +37,7 @@ export function topPlaces(
       visits: sql<number>`count(${stops.id})`,
     })
     .from(stops)
-    .innerJoin(dates, and(eq(dates.id, stops.dateId), isNull(dates.deletedAt)))
+    .innerJoin(dates, eq(dates.id, stops.dateId))
     .where(and(
       monthRangeScope(scope, first, last),
       // place_name is free text and usually blank; an unlabelled row would
