@@ -2,7 +2,6 @@ import { useMemo, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { Canvas, Path, Skia } from '@shopify/react-native-skia';
 import { ringArcs, type RingInput } from './ringGeometry';
-import { theme } from './theme';
 
 /**
  * A ring of a month's spend by kind, with the total in the hole.
@@ -18,8 +17,8 @@ import { theme } from './theme';
 export function Ring({
   slices,
   tintOf,
-  size = 132,
-  thickness = 14,
+  size = 156,
+  thickness = 16,
   children,
 }: {
   slices: readonly RingInput[];
@@ -64,12 +63,24 @@ export function Ring({
         })}
       </Canvas>
 
-      {/* Sits in the hole. Kept out of the canvas so it uses the app's real
-          type rather than Skia's font handling. */}
-      <View style={{ alignItems: 'center', justifyContent: 'center' }}>{children}</View>
+      {/*
+        Sits in the hole. Kept out of the canvas so it uses the app's real type
+        rather than Skia's font handling.
+
+        Width-capped to the hole. Without it the total ran out over the arcs on
+        both sides — a ₱5,062.50 in title type is wider than the hole, and a
+        larger figure only makes it worse, so the cap matters more than the
+        ring's size. Callers pair this with adjustsFontSizeToFit.
+      */}
+      <View style={{ maxWidth: size - thickness * 2 - HOLE_PADDING, alignItems: 'center', justifyContent: 'center' }}>
+        {children}
+      </View>
     </View>
   );
 }
 
-/** The ground showing through when there is nothing to draw. */
-export const RING_EMPTY_TINT = theme.role.line;
+/**
+ * Breathing room between the hole's edge and its text. The hole is a circle,
+ * so text filling its full width would touch the arcs at the corners.
+ */
+const HOLE_PADDING = 16;

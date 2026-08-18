@@ -203,7 +203,12 @@ export default function Dashboard() {
           {!drilledKind && kindSlices.length > 0 && (
             <View style={{ alignItems: 'center', marginTop: theme.space.md }}>
               <Ring slices={kindSlices} tintOf={kindTint}>
-                <Text style={{ ...theme.type.title, color: theme.role.ink }}>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                  style={{ ...theme.type.title, color: theme.role.ink, textAlign: 'center' }}
+                >
                   {formatMoney(money(kindTotal, ctx.currencyCode))}
                 </Text>
                 <MicroLabel>TOTAL</MicroLabel>
