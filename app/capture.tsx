@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Image, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,6 +11,9 @@ import { addPerson, lastPayerId, listPeople } from '@/domain/identity/people';
 import { kindsByRecentUse } from '@/domain/stops/recent';
 import { formatMoney, money, parseMajorToMinor } from '@/domain/money/money';
 import type { StopKind } from '@/domain/stops/taxonomy';
+import { recognizeReceipt } from '@/domain/receipts/recognize';
+import type { ParsedReceipt } from '@/domain/receipts/parse';
+import { minorToMajorString } from '@/domain/money/money';
 import { persistPickedImage } from '@/media/store';
 import { getAppDeps, getLocalContext } from '@/session';
 import { AmountKeypad } from '@/ui/AmountKeypad';
@@ -19,6 +22,7 @@ import { Card } from '@/ui/Card';
 import { KindChips } from '@/ui/KindChips';
 import { MicroLabel } from '@/ui/MicroLabel';
 import { PayerPicker } from '@/ui/PayerPicker';
+import { ReceiptReview } from '@/ui/ReceiptReview';
 import { theme } from '@/ui/theme';
 import { commit } from '@/ui/feedback';
 
@@ -41,6 +45,9 @@ export default function Capture() {
   const [payerId, setPayerId] = useState<string | null>(null);
   const [pendingPhoto, setPendingPhoto] = useState<{ uri: string; width: number; height: number } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [receipt, setReceipt] = useState<ParsedReceipt | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [chosenItems, setChosenItems] = useState<number[]>([]);
 
   const selectedPayerId = payerId ?? defaultPayerId;
 
@@ -61,7 +68,53 @@ export default function Capture() {
     const asset = shot.assets?.[0];
     if (shot.canceled || !asset) return;
     setPendingPhoto({ uri: asset.uri, width: asset.width, height: asset.height });
+
+    // Read the receipt in the background. The keypad stays live throughout —
+    // OCR is a head start on typing, never a gate in front of it.
+    setReceipt(null);
+    setChosenItems([]);
+    setScanning(true);
+    try {
+      setReceipt(await recognizeReceipt(asset.uri, ctx.currencyCode));
+    } catch {
+      // A photo that will not read is not an error worth interrupting for.
+      // The photo is attached and the amount can still be typed.
+      setReceipt(null);
+    } finally {
+      setScanning(false);
+    }
   };
+
+  /**
+   * Ticking receipt items drives the amount directly: the sum of what is
+   * ticked. That is what makes a receipt useful beyond its total — a bill
+   * covering dinner and a gift becomes two stops, each holding only its own
+   * lines, instead of one lump the dashboard cannot categorise.
+   */
+  const toggleItem = (index: number) => {
+    const next = chosenItems.includes(index)
+      ? chosenItems.filter((i) => i !== index)
+      : [...chosenItems, index];
+    setChosenItems(next);
+
+    const sum = next.reduce((total, i) => total + (receipt?.items[i]?.amountMinor ?? 0), 0);
+    setAmount(next.length === 0 ? '' : minorToMajorString(sum, ctx.currencyCode));
+  };
+
+  const useTotal = (amountMinor: number) => {
+    setChosenItems([]);
+    setAmount(minorToMajorString(amountMinor, ctx.currencyCode));
+  };
+
+  // Receipt order, not tap order, so the label reads like the bill.
+  const receiptLabel =
+    chosenItems.length === 0
+      ? null
+      : [...chosenItems]
+          .sort((a, b) => a - b)
+          .map((i) => receipt?.items[i]?.label)
+          .filter((label): label is string => label !== undefined)
+          .join(', ');
 
   const save = async () => {
     if (saving) return;
@@ -98,6 +151,7 @@ export default function Capture() {
         kind,
         amountMinor,
         currencyCode: ctx.currencyCode,
+        label: receiptLabel,
         photo:
           pendingPhoto && durablePhotoUri
             ? {
@@ -139,7 +193,11 @@ export default function Capture() {
         </Text>
       </View>
 
-      <View style={{ flex: 1, paddingTop: theme.space.md, gap: theme.space.md }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: theme.space.md, gap: theme.space.md }}
+        keyboardShouldPersistTaps="handled"
+      >
         {/*
           Full-bleed rather than inset like the feed's cards: this keypad is
           the whole point of a five-second capture sheet, and giving it the
@@ -147,6 +205,31 @@ export default function Capture() {
           several.
         */}
         <AmountKeypad value={amount} onChange={setAmount} currencyCode={ctx.currencyCode} />
+
+        {(scanning || receipt !== null) && (
+          <View style={{ paddingHorizontal: theme.space.md }}>
+            {scanning ? (
+              <Card>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.sm }}>
+                  <ActivityIndicator color={theme.role.primary} />
+                  <Text style={{ ...theme.type.meta, color: theme.role.inkMuted }}>
+                    Reading the receipt…
+                  </Text>
+                </View>
+              </Card>
+            ) : (
+              receipt !== null && (
+                <ReceiptReview
+                  receipt={receipt}
+                  currencyCode={ctx.currencyCode}
+                  selected={chosenItems}
+                  onToggleItem={toggleItem}
+                  onUseTotal={useTotal}
+                />
+              )
+            )}
+          </View>
+        )}
 
         <View style={{ paddingHorizontal: theme.space.md, gap: theme.space.sm }}>
           <MicroLabel>WHO PAID</MicroLabel>
@@ -166,7 +249,7 @@ export default function Capture() {
           <MicroLabel>KIND</MicroLabel>
         </View>
         <KindChips kinds={kinds} selected={kind} onSelect={setKind} />
-      </View>
+      </ScrollView>
 
       <View
         style={{

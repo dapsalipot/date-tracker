@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addMoney,
+  minorToMajorString,
   formatMoney,
   money,
   parseMajorToMinor,
@@ -93,5 +94,31 @@ describe('formatMoney', () => {
 
   it('formats zero-exponent currencies without decimals', () => {
     expect(formatMoney(money(1200, 'JPY'))).toBe('¥1,200');
+  });
+});
+
+describe('minorToMajorString', () => {
+  it('writes a two-decimal currency as the keypad expects it', () => {
+    expect(minorToMajorString(42050, 'PHP')).toBe('420.50');
+  });
+
+  it('keeps the trailing zeros a keypad value needs', () => {
+    // '420.5' would let the next digit press append a third decimal place.
+    expect(minorToMajorString(42000, 'PHP')).toBe('420.00');
+  });
+
+  it('pads an amount smaller than one major unit', () => {
+    expect(minorToMajorString(5, 'PHP')).toBe('0.05');
+  });
+
+  it('writes a zero-exponent currency with no decimal point at all', () => {
+    // A decimal point in a JPY keypad value would let a user type sub-yen.
+    expect(minorToMajorString(1240, 'JPY')).toBe('1240');
+  });
+
+  it('round-trips through the parser', () => {
+    for (const [minor, code] of [[42050, 'PHP'], [5, 'USD'], [1240, 'JPY']] as const) {
+      expect(parseMajorToMinor(minorToMajorString(minor, code), code).amountMinor).toBe(minor);
+    }
   });
 });

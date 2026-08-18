@@ -99,3 +99,26 @@ export function formatMoney(value: Money): string {
 
   return `${negative ? '-' : ''}${symbol}${body}`;
 }
+
+/**
+ * Writes an amount the way the keypad holds it: major units, no symbol, no
+ * grouping — "420.50", not "₱420.50" and not "420.5".
+ *
+ * The trailing zeros matter. AmountKeypad appends digits and caps the fraction
+ * at the currency's exponent, so seeding it with "420.5" leaves room for one
+ * more decimal place and the next key press produces "420.55".
+ *
+ * `formatMoney` cannot do this job: its output carries a currency symbol, which
+ * `parseMajorToMinor` will not read back.
+ */
+export function minorToMajorString(amountMinor: number, currencyCode: string): string {
+  const exponent = minorExponent(currencyCode);
+  // Integer arithmetic throughout. Dividing by 10**exponent would put money
+  // through a float, which is the one thing this module exists to avoid.
+  const digits = String(Math.abs(amountMinor)).padStart(exponent + 1, '0');
+  const sign = amountMinor < 0 ? '-' : '';
+
+  if (exponent === 0) return `${sign}${digits}`;
+
+  return `${sign}${digits.slice(0, -exponent)}.${digits.slice(-exponent)}`;
+}
