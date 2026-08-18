@@ -48,6 +48,13 @@ export default function Capture() {
   const [receipt, setReceipt] = useState<ParsedReceipt | null>(null);
   const [scanning, setScanning] = useState(false);
   const [chosenItems, setChosenItems] = useState<number[]>([]);
+  /**
+   * Whether the amount on the keypad came from a receipt rather than from
+   * typing. Retaking a photo has to clear a receipt-derived amount — otherwise
+   * the first receipt's total sits under the second receipt's photo and saves
+   * against it — but must never discard a figure the user typed by hand.
+   */
+  const [amountFromReceipt, setAmountFromReceipt] = useState(false);
 
   const selectedPayerId = payerId ?? defaultPayerId;
 
@@ -73,6 +80,10 @@ export default function Capture() {
     // OCR is a head start on typing, never a gate in front of it.
     setReceipt(null);
     setChosenItems([]);
+    if (amountFromReceipt) {
+      setAmount('');
+      setAmountFromReceipt(false);
+    }
     setScanning(true);
     try {
       setReceipt(await recognizeReceipt(asset.uri, ctx.currencyCode));
@@ -99,11 +110,24 @@ export default function Capture() {
 
     const sum = next.reduce((total, i) => total + (receipt?.items[i]?.amountMinor ?? 0), 0);
     setAmount(next.length === 0 ? '' : minorToMajorString(sum, ctx.currencyCode));
+    setAmountFromReceipt(next.length > 0);
   };
 
   const useTotal = (amountMinor: number) => {
     setChosenItems([]);
     setAmount(minorToMajorString(amountMinor, ctx.currencyCode));
+    setAmountFromReceipt(true);
+  };
+
+  /**
+   * Typing takes the amount back from the receipt, and drops the ticks with it:
+   * once the figure is no longer their sum, leaving them ticked would name the
+   * stop after items whose total it no longer holds.
+   */
+  const typeAmount = (next: string) => {
+    setAmount(next);
+    setAmountFromReceipt(false);
+    setChosenItems([]);
   };
 
   // Receipt order, not tap order, so the label reads like the bill.
@@ -204,7 +228,7 @@ export default function Capture() {
           entire width makes it the obvious hero rather than one card among
           several.
         */}
-        <AmountKeypad value={amount} onChange={setAmount} currencyCode={ctx.currencyCode} />
+        <AmountKeypad value={amount} onChange={typeAmount} currencyCode={ctx.currencyCode} />
 
         {(scanning || receipt !== null) && (
           <View style={{ paddingHorizontal: theme.space.md }}>
