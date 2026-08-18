@@ -36,11 +36,13 @@ export function Ring({
     // Built here rather than in the render body: Skia.Path.Make allocates a
     // native object, and doing that per arc per render leaves one behind every
     // time the month changes.
-    return ringArcs(slices).map((arc) => {
-      const path = Skia.Path.Make();
-      path.addArc(oval, arc.startAngle, arc.sweepAngle);
-      return { key: arc.key, path };
-    });
+    return ringArcs(slices).map((arc) => ({
+      key: arc.key,
+      // PathBuilder, not the deprecated SkPath.addArc. detach() rather than
+      // build() because each builder makes one arc and is then discarded, so
+      // there is nothing to copy for.
+      path: Skia.PathBuilder.Make().addArc(oval, arc.startAngle, arc.sweepAngle).detach(),
+    }));
   }, [slices, size, thickness]);
 
   return (
