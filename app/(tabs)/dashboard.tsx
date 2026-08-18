@@ -14,6 +14,7 @@ import { Bar } from '@/ui/Bar';
 import { Card } from '@/ui/Card';
 import { isStopKind } from '@/ui/KindIcon';
 import { MicroLabel } from '@/ui/MicroLabel';
+import { Ring } from '@/ui/Ring';
 import { Screen } from '@/ui/Screen';
 import { theme } from '@/ui/theme';
 
@@ -77,6 +78,7 @@ export default function Dashboard() {
   const { budget, kindSlices, subkindSlices, trend, average, places } = vm;
   const budgetMinor = budget.budgetMinor;
   const topKindTotal = kindSlices[0]?.totalMinor ?? 1;
+  const kindTotal = kindSlices.reduce((sum, slice) => sum + slice.totalMinor, 0);
   const topSubkindTotal = subkindSlices[0]?.totalMinor ?? 1;
   const topTrendTotal = Math.max(...trend.map((m) => m.totalMinor), 1);
 
@@ -187,6 +189,26 @@ export default function Dashboard() {
             </View>
           ) : (
             <MicroLabel>WHERE IT WENT</MicroLabel>
+          )}
+
+          {/*
+            Composition above, ranking below. The bars answer "which kind cost
+            most" but make a share hard to see: reading one bar against the sum
+            of the others is arithmetic. The ring shows the split directly, and
+            its hole carries the total the shares are of.
+
+            Kind level only. A ring of subkinds would be slices that all share
+            their parent's colour, which shows nothing the bars do not.
+          */}
+          {!drilledKind && kindSlices.length > 0 && (
+            <View style={{ alignItems: 'center', marginTop: theme.space.md }}>
+              <Ring slices={kindSlices} tintOf={kindTint}>
+                <Text style={{ ...theme.type.title, color: theme.role.ink }}>
+                  {formatMoney(money(kindTotal, ctx.currencyCode))}
+                </Text>
+                <MicroLabel>TOTAL</MicroLabel>
+              </Ring>
+            </View>
           )}
 
           <View style={{ gap: theme.space.sm, marginTop: theme.space.sm }}>

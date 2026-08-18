@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createTestDb, testDeps } from '@/test/testDb';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { listFeedDates } from '@/domain/dates/repository';
@@ -9,6 +9,17 @@ import { budgets } from '@/db/schema';
 import { seedTwelveMonths } from './seed';
 
 const AUG_3 = testDeps(1_785_000_000_000, '2026-08-03');
+
+/**
+ * Every test here seeds a full year, and better-sqlite3 is synchronous. Alone
+ * each takes well under a second, but vitest runs test files in parallel worker
+ * threads, so on a loaded machine these compete for a core — during a native
+ * build they have measured over 16s. The work is genuinely this size, so the
+ * budget is what gets raised, and file-wide rather than test-by-test: a per-test
+ * timeout fixes whichever test lost the race that day and leaves its neighbours
+ * to fail next time.
+ */
+vi.setConfig({ testTimeout: 30_000 });
 
 describe('seedTwelveMonths', () => {
   it('creates a year of dates with stops and budgets', () => {
@@ -60,12 +71,7 @@ describe('seedTwelveMonths', () => {
     };
 
     expect(runOnce()).toEqual(runOnce());
-    // Seeds a full year twice, and better-sqlite3 is synchronous. Alone it
-    // takes ~500ms, but vitest runs files in parallel worker threads, so under
-    // a full-suite run it competes for a core and has measured over 6s. The
-    // default 5s budget makes it flaky on a busy machine; the work is genuinely
-    // this size, so the budget is what gets raised.
-  }, 30_000);
+  });
 
   it('produces varied titles and published dates, not 48 identical drafts', () => {
     const db = createTestDb();
