@@ -60,7 +60,12 @@ describe('seedTwelveMonths', () => {
     };
 
     expect(runOnce()).toEqual(runOnce());
-  });
+    // Seeds a full year twice, and better-sqlite3 is synchronous. Alone it
+    // takes ~500ms, but vitest runs files in parallel worker threads, so under
+    // a full-suite run it competes for a core and has measured over 6s. The
+    // default 5s budget makes it flaky on a busy machine; the work is genuinely
+    // this size, so the budget is what gets raised.
+  }, 30_000);
 
   it('produces varied titles and published dates, not 48 identical drafts', () => {
     const db = createTestDb();
