@@ -1,6 +1,10 @@
-import { Alert, Pressable, ScrollView, Text } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { Person } from '@/domain/identity/people';
+import { Button } from './Button';
+import { Card } from './Card';
+import { MicroLabel } from './MicroLabel';
 import { commit, tap } from './feedback';
 import { theme } from './theme';
 
@@ -25,24 +29,94 @@ const ADD_LABEL = 'Add someone';
  * sheet's unpadded flex column adds it around the whole picker, the stop
  * editor's ScrollView already pads every child.
  *
- * ponytail: name entry uses the platform Alert.prompt, which is iOS-only.
- * Android would need a bespoke text-input modal if that platform matters.
+ * Name entry is a plain modal rather than Alert.prompt. Alert.prompt exists
+ * only on iOS and is a silent no-op on Android, so adding a person there did
+ * nothing at all — no dialog, no error, no person.
  */
 export function PayerPicker({ people, selected, onSelect, onAdd }: Props) {
+  const [asking, setAsking] = useState(false);
+  const [draftName, setDraftName] = useState('');
+
   const promptForName = () => {
-    Alert.prompt('Who paid?', undefined, (name) => {
-      try {
-        const id = onAdd(name);
-        onSelect(id);
-        commit();
-      } catch {
-        Alert.alert('Needs a name', 'Enter a name for this person.');
-      }
-    });
+    setDraftName('');
+    setAsking(true);
   };
+
+  const confirmName = () => {
+    let id: string;
+    try {
+      id = onAdd(draftName);
+    } catch {
+      // addPerson rejects a name that is blank once trimmed. Keep the sheet
+      // open with the text intact rather than closing and losing it.
+      return;
+    }
+    setAsking(false);
+    onSelect(id);
+    commit();
+  };
+
+  // Trimmed, because the domain rejects a name that is only whitespace and the
+  // button should not offer to do what it will refuse.
+  const canConfirm = draftName.trim() !== '';
+
+  const nameSheet = (
+    <Modal visible={asking} transparent animationType="fade" onRequestClose={() => setAsking(false)}>
+      <Pressable
+        onPress={() => setAsking(false)}
+        style={{
+          flex: 1,
+          backgroundColor: '#000000CC',
+          justifyContent: 'center',
+          padding: theme.space.md,
+        }}
+      >
+        {/* Swallows the press so tapping the card itself does not dismiss it. */}
+        <Pressable onPress={() => {}}>
+          <Card>
+            <View style={{ gap: theme.space.sm }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.xs }}>
+                <Ionicons name="person-add-outline" size={16} color={theme.role.primary} />
+                <MicroLabel>WHO PAID</MicroLabel>
+              </View>
+
+              <TextInput
+                value={draftName}
+                onChangeText={setDraftName}
+                placeholder="Their name"
+                placeholderTextColor={theme.role.inkMuted}
+                autoFocus
+                maxLength={40}
+                returnKeyType="done"
+                onSubmitEditing={() => { if (canConfirm) confirmName(); }}
+                style={{
+                  ...theme.type.title,
+                  color: theme.role.ink,
+                  paddingVertical: theme.space.sm,
+                  borderBottomWidth: 1,
+                  borderBottomColor: theme.role.line,
+                }}
+              />
+
+              <View style={{ flexDirection: 'row', gap: theme.space.sm, marginTop: theme.space.xs }}>
+                <View style={{ flex: 1 }}>
+                  <Button variant="quiet" label="Cancel" onPress={() => setAsking(false)} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button label="Add" onPress={confirmName} disabled={!canConfirm} />
+                </View>
+              </View>
+            </View>
+          </Card>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
 
   if (people.length <= 1) {
     return (
+      <>
+      {nameSheet}
       <Pressable
         onPress={() => { tap(); promptForName(); }}
         style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.xs }}
@@ -50,10 +124,13 @@ export function PayerPicker({ people, selected, onSelect, onAdd }: Props) {
         <Ionicons name="person-add-outline" size={14} color={theme.role.inkMuted} />
         <Text style={{ ...theme.type.meta, color: theme.role.inkMuted }}>{ADD_LABEL}</Text>
       </Pressable>
+      </>
     );
   }
 
   return (
+    <>
+    {nameSheet}
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
@@ -96,5 +173,6 @@ export function PayerPicker({ people, selected, onSelect, onAdd }: Props) {
         <Text style={{ ...theme.type.meta, color: theme.role.inkMuted }}>{ADD_LABEL}</Text>
       </Pressable>
     </ScrollView>
+    </>
   );
 }
