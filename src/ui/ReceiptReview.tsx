@@ -29,6 +29,10 @@ export function ReceiptReview({
   onUseTotal: (amountMinor: number) => void;
 }) {
   const show = (amountMinor: number) => formatMoney(money(amountMinor, currencyCode));
+  // Bound once so the JSX below narrows properly. Reading receipt.totalMinor
+  // inside the branch needs a cast, and a cast is how a null reaches formatMoney
+  // unnoticed the day this branch is edited.
+  const totalMinor = receipt.totalMinor;
 
   if (receipt.items.length === 0 && receipt.totalMinor === null) {
     return (
@@ -82,13 +86,13 @@ export function ReceiptReview({
           );
         })}
 
-        {receipt.totalMinor === null ? (
+        {totalMinor === null ? (
           <Text style={{ ...theme.type.meta, color: theme.role.inkMuted }}>
             No total found — tick the items you want or type the amount.
           </Text>
         ) : (
           <Pressable
-            onPress={() => { tap(); onUseTotal(receipt.totalMinor as number); }}
+            onPress={() => { tap(); onUseTotal(totalMinor); }}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -101,7 +105,7 @@ export function ReceiptReview({
             <Ionicons name="arrow-up-circle" size={20} color={theme.role.primary} />
             <Text style={{ ...theme.type.body, color: theme.role.ink, flex: 1 }}>Use total</Text>
             <Text style={{ ...theme.type.title, color: theme.role.primary }}>
-              {show(receipt.totalMinor)}
+              {show(totalMinor)}
             </Text>
           </Pressable>
         )}
