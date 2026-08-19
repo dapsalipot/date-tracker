@@ -287,9 +287,15 @@ describe('listFeedDates', () => {
     const { db, coupleId, userId } = setup();
     const scope = { coupleId, currencyCode: 'PHP' };
 
-    captureStop(db, AUG_3, { coupleId, userId, kind: 'food', amountMinor: 10000, currencyCode: 'PHP' });
-    captureStop(db, AUG_3, { coupleId, userId, kind: 'food', amountMinor: 10000, currencyCode: 'JPY' });
-    captureStop(db, AUG_4, { coupleId, userId, kind: 'food', amountMinor: 5000, currencyCode: 'JPY' });
+    captureStop(db, AUG_3, {
+      coupleId, userId, kind: 'food', amountMinor: 10000, currencyCode: 'PHP', placeName: 'Cafe Ysabel',
+    });
+    captureStop(db, AUG_3, {
+      coupleId, userId, kind: 'food', amountMinor: 10000, currencyCode: 'JPY', placeName: 'Ichiran',
+    });
+    captureStop(db, AUG_4, {
+      coupleId, userId, kind: 'food', amountMinor: 5000, currencyCode: 'JPY', placeName: 'Ichiran',
+    });
 
     // Both are 10000 minor units, but ₱100.00 and ¥10000 are not ₱200.00.
     const feed = listFeedDates(db, scope);
@@ -299,14 +305,47 @@ describe('listFeedDates', () => {
     expect(aug3?.totalMinor).toBe(10000);
     expect(aug3?.stopCount).toBe(1);
     expect(aug3?.currencyCode).toBe('PHP');
+    // Only the PHP stop's place counts — the JPY stop is excluded by the same
+    // ON-clause currency predicate that excludes it from stopCount/totalMinor.
+    expect(aug3?.places).toEqual(['Cafe Ysabel']);
 
     // A date whose only stop is in another currency must still appear in the
     // feed — the currency predicate lives in the ON clause, not the WHERE —
-    // with a zero total rather than vanishing entirely.
+    // with a zero total rather than vanishing entirely, and with no places:
+    // its one stop ("Ichiran") is filtered out by that same predicate, so a
+    // places aggregate that ignored the ON-clause scoping would leak it in
+    // here instead of the row disappearing outright.
     const aug4 = feed.find((d) => d.occurredOn === '2026-08-04');
     expect(aug4?.stopCount).toBe(0);
     expect(aug4?.totalMinor).toBe(0);
     expect(aug4?.currencyCode).toBe('PHP');
+    expect(aug4?.places).toEqual([]);
+  });
+
+  it('lists distinct place names and counts distinct payers', () => {
+    const { db, coupleId, userId } = setup();
+    const partnerId = 'partner-user';
+    const scope = { coupleId, currencyCode: 'PHP' };
+
+    captureStop(db, AUG_3, {
+      coupleId, userId, kind: 'food', amountMinor: 10000, currencyCode: 'PHP', placeName: 'Cafe Ysabel',
+    });
+    captureStop(db, AUG_3, {
+      coupleId, userId, kind: 'activity', amountMinor: 20000, currencyCode: 'PHP', placeName: 'Cafe Ysabel',
+    });
+    captureStop(db, AUG_3, {
+      coupleId, userId: partnerId, kind: 'transport', amountMinor: 5000, currencyCode: 'PHP', placeName: 'Grab',
+    });
+
+    const feed = listFeedDates(db, scope);
+    const aug3 = feed.find((d) => d.occurredOn === '2026-08-03');
+
+    // Three stops, two distinct place names — group_concat(distinct ...) must
+    // collapse the repeated "Cafe Ysabel" rather than listing it twice.
+    expect(aug3?.places).toEqual(['Cafe Ysabel', 'Grab']);
+    // Two distinct payers even though one of them paid for two of the three
+    // stops — counting stops instead of distinct payers would read 3 here.
+    expect(aug3?.payerCount).toBe(2);
   });
 
   it('carries the cover photo uri onto the feed card', () => {

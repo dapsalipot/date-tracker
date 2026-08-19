@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, SectionList, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -10,10 +10,11 @@ import { dailySpend } from '@/domain/analytics/daily';
 import { shiftMonth } from '@/domain/analytics/period';
 import { toFeedDate, type FeedDate } from '@/domain/dates/repository';
 import { draftDatesQuery, listQueuedStops, publishedDatesQuery, type QueuedStop } from '@/domain/dates/drafts';
+import { splitHero } from '@/domain/dates/rhythm';
 import { formatMoney, money } from '@/domain/money/money';
 import { attachPhoto } from '@/domain/photos/repository';
 import { persistPickedImage } from '@/media/store';
-import { FeedCard, kindLabel } from '@/render/FeedCard';
+import { FeedCard, FeedHero, kindLabel } from '@/render/FeedCard';
 import { seedTwelveMonths } from '@/fixtures/seed';
 import { getAppDeps, getLocalContext } from '@/session';
 import { CalendarGrid } from '@/ui/CalendarGrid';
@@ -383,34 +384,25 @@ export default function Feed() {
       )}
 
       {isSearching ? (
-        <SectionList
-          style={{ flex: 1 }}
-          sections={searchSections}
-          keyExtractor={(item) => item.id}
-          stickySectionHeadersEnabled={false}
-          contentContainerStyle={{ paddingBottom: theme.space.xxl, gap: theme.space.md }}
-          renderSectionHeader={({ section }) => <MonthHeader section={section} currencyCode={ctx.currencyCode} />}
-          renderItem={({ item }) => (
-            <FeedCard date={item} onPress={() => router.push(`/date/${item.id}`)} />
-          )}
-          ListEmptyComponent={
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: theme.space.xxl, gap: theme.space.md }}>
+          {searchSections.length === 0 ? (
             <Card>
               <Text style={{ ...theme.type.body, color: t.role.inkMuted, textAlign: 'center' }}>
                 No dates match "{search.trim()}"
               </Text>
             </Card>
-          }
-        />
-      ) : (
-        <FlatList
-          style={{ flex: 1 }}
-          data={displayedMonthDates}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: theme.space.xxl, gap: theme.space.md }}
-          renderItem={({ item }) => (
-            <FeedCard date={item} onPress={() => router.push(`/date/${item.id}`)} />
+          ) : (
+            searchSections.map((section) => (
+              <View key={section.monthKey} style={{ gap: theme.space.md }}>
+                <MonthHeader section={section} currencyCode={ctx.currencyCode} />
+                <FeedRhythm dates={section.data} onPress={(item) => router.push(`/date/${item.id}`)} />
+              </View>
+            ))
           )}
-          ListEmptyComponent={
+        </ScrollView>
+      ) : (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: theme.space.xxl }}>
+          {displayedMonthDates.length === 0 ? (
             drafts.length === 0 && published.length === 0 ? (
               <Card onPress={() => seedTwelveMonths(db, ctx.coupleId, ctx.userId, todayLocal, deps)}>
                 <Text style={{ ...theme.type.body, fontFamily: theme.type.meta.fontFamily, color: t.role.ink, textAlign: 'center' }}>
@@ -424,8 +416,10 @@ export default function Feed() {
                 </Text>
               </Card>
             )
-          }
-        />
+          ) : (
+            <FeedRhythm dates={displayedMonthDates} onPress={(item) => router.push(`/date/${item.id}`)} />
+          )}
+        </ScrollView>
       )}
 
       <Pressable
@@ -492,6 +486,38 @@ function MonthHeader({ section, currencyCode }: { section: MonthSection; currenc
       <Text style={{ ...theme.type.body, color: t.role.ink, fontFamily: theme.type.meta.fontFamily }}>
         {formatMoney(money(section.totalMinor, currencyCode))}
       </Text>
+    </View>
+  );
+}
+
+/**
+ * The feed's rhythm: `splitHero` promotes the newest published date to a
+ * full-bleed hero, everything else falls into a two-column grid — the
+ * pattern that keeps a run of dates from reading as one uniform column.
+ * Applied per month section (a search result group or the calendar's single
+ * displayed month), so every section gets its own hero rather than one for
+ * the whole screen.
+ */
+function FeedRhythm({ dates, onPress }: { dates: readonly FeedDate[]; onPress: (date: FeedDate) => void }) {
+  const { hero, rest } = splitHero(dates);
+  const rows: FeedDate[][] = [];
+  for (let i = 0; i < rest.length; i += 2) rows.push(rest.slice(i, i + 2));
+
+  return (
+    <View style={{ gap: theme.space.md }}>
+      {hero !== null && <FeedHero date={hero} onPress={() => onPress(hero)} />}
+      {rows.map((row) => (
+        <View key={row[0]!.id} style={{ flexDirection: 'row', gap: theme.space.md }}>
+          <View style={{ flex: 1 }}>
+            <FeedCard date={row[0]!} onPress={() => onPress(row[0]!)} />
+          </View>
+          {/* An empty spacer keeps a trailing odd card at half width instead
+              of stretching to fill the row. */}
+          <View style={{ flex: 1 }}>
+            {row[1] !== undefined && <FeedCard date={row[1]} onPress={() => onPress(row[1]!)} />}
+          </View>
+        </View>
+      ))}
     </View>
   );
 }

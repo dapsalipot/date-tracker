@@ -15,6 +15,8 @@ function scopedQuery(db: AppDatabase, scope: CoupleScope, status: string) {
       stopCount: sql<number>`count(${stops.id})`,
       totalMinor: sql<number>`coalesce(sum(${stops.amountMinor}), 0)`,
       kinds: sql<string | null>`group_concat(distinct ${stops.kind})`,
+      places: sql<string | null>`group_concat(distinct ${stops.placeName})`,
+      payerCount: sql<number>`count(distinct ${stops.paidByUserId})`,
     })
     .from(dates)
     .leftJoin(

@@ -1,12 +1,15 @@
-import { Image, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 import type { FeedDate } from '@/domain/dates/repository';
 import { formatMoney, money } from '@/domain/money/money';
 import { Card } from '@/ui/Card';
-import { isStopKind, KindIcon } from '@/ui/KindIcon';
+import { KindIcon } from '@/ui/KindIcon';
 import { theme } from '@/ui/theme';
 import { useTheme } from '@/ui/ThemeProvider';
+import { tap } from '@/ui/feedback';
 
 const COVER_HEIGHT = 96;
+/** 16:9 — the hero's fixed aspect ratio, independent of device width. */
+const HERO_ASPECT = 16 / 9;
 
 const WEEKDAYS_BY_ZELLER_H = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as const;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -46,10 +49,11 @@ interface Props {
 }
 
 /**
- * A `Card`: the strip and cards-with-space-between direction the editorial
- * layout was rejected in favour of. Most dates never get a cover photo, so
- * the no-photo layout is the default appearance — it goes straight from the
- * card's rounded top to the body, no reserved block and no placeholder.
+ * A `Card`, matted: the photo (if any) sits inset inside the bordered card
+ * rather than bleeding to its edges, distinguishing it from `FeedHero` below.
+ * Most dates never get a cover photo, so the no-photo layout is the default
+ * appearance — it goes straight from the card's rounded top to the body, no
+ * reserved block and no placeholder.
  *
  * `Card` itself owns the press scale and the `tap()` haptic, so this
  * component has no animation or gesture code of its own.
@@ -60,15 +64,7 @@ export function FeedCard({ date, onPress }: Props) {
   const stopLabel = date.stopCount === 1 ? '1 stop' : `${date.stopCount} stops`;
 
   return (
-    <Card padded={false} onPress={onPress}>
-      {date.coverUri !== null && (
-        <Image
-          source={{ uri: date.coverUri }}
-          style={{ width: '100%', height: COVER_HEIGHT }}
-          resizeMode="cover"
-        />
-      )}
-
+    <Card padded={false} onPress={onPress} photoUri={date.coverUri} photoHeight={COVER_HEIGHT}>
       <View style={{ padding: theme.space.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
           <Text
@@ -85,31 +81,90 @@ export function FeedCard({ date, onPress }: Props) {
         </Text>
 
         {date.kinds.length > 0 && (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.space.xs, marginTop: theme.space.sm }}>
-            {date.kinds.map((kind) => {
-              const tint = isStopKind(kind) ? t.kind[kind] : t.kind.other;
-              return (
-                <View
-                  key={kind}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 4,
-                    paddingHorizontal: theme.space.sm,
-                    paddingVertical: 3,
-                    borderRadius: 999,
-                    borderWidth: 1,
-                    borderColor: tint,
-                  }}
-                >
-                  <KindIcon kind={kind} size={12} color={tint} />
-                  <Text style={{ ...theme.type.micro, color: tint }}>{kindLabel(kind)}</Text>
-                </View>
-              );
-            })}
+          <View style={{ flexDirection: 'row', gap: theme.space.xs, marginTop: theme.space.sm }}>
+            {date.kinds.map((kind) => (
+              <KindIcon key={kind} kind={kind} size={13} />
+            ))}
           </View>
+        )}
+
+        {date.places.length > 0 && (
+          <Text
+            style={{ ...theme.type.meta, color: t.role.inkMuted, marginTop: theme.space.xs }}
+            numberOfLines={1}
+          >
+            {date.places.join(' · ')}
+          </Text>
+        )}
+
+        {date.payerCount > 1 && (
+          <Text style={{ ...theme.type.micro, color: t.role.primary, marginTop: theme.space.xs }}>
+            SPLIT
+          </Text>
         )}
       </View>
     </Card>
+  );
+}
+
+/**
+ * The one full-bleed card at the top of a month: the newest published date,
+ * shown large. Deliberately not a `Card` with `photoUri` — that mats the
+ * photo, and the hero is the one place in the feed that should not be.
+ * Title and meta sit over a bottom scrim so they read against any photo
+ * brightness; without a photo they sit directly on the card's own surface,
+ * following the same no-placeholder rule `FeedCard` uses.
+ */
+export function FeedHero({ date, onPress }: Props) {
+  const t = useTheme();
+  const total = formatMoney(money(date.totalMinor, date.currencyCode));
+  const stopLabel = date.stopCount === 1 ? '1 stop' : `${date.stopCount} stops`;
+  const hasCover = date.coverUri !== null;
+
+  const caption = (
+    <>
+      <Text style={{ ...theme.type.display, color: hasCover ? '#FFFFFF' : t.role.ink }} numberOfLines={1}>
+        {date.title ?? 'Untitled date'}
+      </Text>
+      <Text
+        style={{
+          ...theme.type.meta,
+          color: hasCover ? 'rgba(255,255,255,0.85)' : t.role.inkMuted,
+          marginTop: theme.space.xs,
+        }}
+      >
+        {formatDateLabel(date.occurredOn)} · {stopLabel} · {total}
+      </Text>
+    </>
+  );
+
+  return (
+    <Pressable
+      onPress={() => { tap(); onPress(); }}
+      style={{
+        borderRadius: theme.radius.xl,
+        overflow: 'hidden',
+        backgroundColor: t.role.surface,
+        borderWidth: 1,
+        borderColor: t.role.line,
+        ...(t.lift ?? {}),
+      }}
+    >
+      {hasCover ? (
+        <View style={{ width: '100%', aspectRatio: HERO_ASPECT }}>
+          <Image source={{ uri: date.coverUri as string }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          <View
+            style={{
+              position: 'absolute', left: 0, right: 0, bottom: 0,
+              padding: theme.space.md, backgroundColor: 'rgba(0,0,0,0.45)',
+            }}
+          >
+            {caption}
+          </View>
+        </View>
+      ) : (
+        <View style={{ padding: theme.space.md }}>{caption}</View>
+      )}
+    </Pressable>
   );
 }
