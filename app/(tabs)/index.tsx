@@ -279,6 +279,14 @@ function FeedListHeader({
   );
 }
 
+/**
+ * Bottom room so the last card clears the floating add button rather than
+ * sliding under it. The FAB sits `space.lg` from the bottom and is 60 tall, so
+ * anything less than that sum plus a gap leaves the final row's meta line
+ * partly hidden — which is exactly what it did at `space.xxl` (64).
+ */
+const LIST_BOTTOM_INSET = theme.space.lg + 60 + theme.space.md;
+
 export default function Feed() {
   const t = useTheme();
   const ctx = getLocalContext();
@@ -480,7 +488,7 @@ export default function Feed() {
           keyExtractor={feedRowKey}
           stickySectionHeadersEnabled={false}
           ListHeaderComponent={listHeader}
-          contentContainerStyle={{ paddingBottom: theme.space.xxl, gap: theme.space.md }}
+          contentContainerStyle={{ paddingBottom: LIST_BOTTOM_INSET, gap: theme.space.md }}
           renderSectionHeader={({ section }) => <MonthHeader section={section} currencyCode={ctx.currencyCode} />}
           renderItem={({ item }) => (
             <FeedRhythmRow row={item} onPress={(date) => router.push(`/date/${date.id}`)} />
@@ -499,7 +507,7 @@ export default function Feed() {
           data={monthRows}
           keyExtractor={feedRowKey}
           ListHeaderComponent={listHeader}
-          contentContainerStyle={{ paddingBottom: theme.space.xxl, gap: theme.space.md }}
+          contentContainerStyle={{ paddingBottom: LIST_BOTTOM_INSET, gap: theme.space.md }}
           renderItem={({ item }) => (
             <FeedRhythmRow row={item} onPress={(date) => router.push(`/date/${date.id}`)} />
           )}
