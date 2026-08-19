@@ -60,6 +60,12 @@ describe('type scale', () => {
 
 const AA_TEXT = 4.5;
 const AA_LARGE = 3;
+// Not a legibility tier like the two above — this only guards "not the same
+// colour as the button," so it sits far below WCAG's weakest ratio. Set from
+// the real palettes: the tightest of all twelve kind-vs-primary pairs is
+// light's gift (#7A3FA8) against primary (#A61B34) at 1.098:1, which clears
+// 1.05 comfortably while sitting nowhere near a 1:1 collision.
+const MIN_KIND_PRIMARY_SEPARATION = 1.05;
 
 function keyPaths(value: unknown, prefix = ''): string[] {
   if (value === null || typeof value !== 'object') return [prefix];
@@ -101,6 +107,31 @@ describe('themes', () => {
       // 3.41:1 and was unreadable.
       for (const k of STOP_KINDS) {
         expect(contrastRatio(t.kind[k], t.role.surface)).toBeGreaterThanOrEqual(AA_TEXT);
+      }
+    },
+  );
+
+  it.each([['light', lightTheme], ['dark', darkTheme]] as const)(
+    '%s keeps every kind colour distinct from the others',
+    (_name, t: Theme) => {
+      // Two kinds sharing a hex makes the spending breakdown ambiguous — a bar
+      // chart where food and gift render as the same colour.
+      const used = STOP_KINDS.map((k) => t.kind[k].toUpperCase());
+      expect(new Set(used).size).toBe(used.length);
+    },
+  );
+
+  it.each([['light', lightTheme], ['dark', darkTheme]] as const)(
+    '%s keeps every kind clear of the primary accent',
+    (_name, t: Theme) => {
+      // Kinds stay clear of red so the accent owns that end of the spectrum
+      // alone. Exact-string inequality is too weak to guard this — two colours
+      // can be visually indistinguishable without matching strings — so this
+      // checks perceptual separation via contrastRatio instead of `!==`.
+      for (const k of STOP_KINDS) {
+        expect(contrastRatio(t.kind[k], t.role.primary)).toBeGreaterThanOrEqual(
+          MIN_KIND_PRIMARY_SEPARATION,
+        );
       }
     },
   );
