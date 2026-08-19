@@ -22,6 +22,7 @@ import { Card } from '@/ui/Card';
 import { KindIcon } from '@/ui/KindIcon';
 import { MicroLabel } from '@/ui/MicroLabel';
 import { Rule } from '@/ui/Rule';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '@/ui/Screen';
 import { theme } from '@/ui/theme';
 import { useTheme } from '@/ui/ThemeProvider';
@@ -280,15 +281,23 @@ function FeedListHeader({
 }
 
 /**
- * Bottom room so the last card clears the floating add button rather than
- * sliding under it. The FAB sits `space.lg` from the bottom and is 60 tall, so
- * anything less than that sum plus a gap leaves the final row's meta line
- * partly hidden — which is exactly what it did at `space.xxl` (64).
+ * A standard iOS tab bar is 49pt above the home-indicator inset. `Screen` sets
+ * safe-area edges to top/left/right only, deliberately — the tab bar draws over
+ * the content — so anything scrollable has to add that room back itself or its
+ * last row is clipped by the bar.
  */
-const LIST_BOTTOM_INSET = theme.space.lg + 60 + theme.space.md;
+const TAB_BAR_HEIGHT = 49;
+
+/** The add button's own footprint: its offset from the bottom plus its size. */
+const FAB_CLEARANCE = theme.space.lg + 60;
 
 export default function Feed() {
   const t = useTheme();
+  // Room for the tab bar the content scrolls under, plus the floating add
+  // button, so the final card is fully readable rather than tucked behind them.
+  const insets = useSafeAreaInsets();
+  const listBottomInset = TAB_BAR_HEIGHT + insets.bottom + FAB_CLEARANCE + theme.space.md;
+
   const ctx = getLocalContext();
   const deps = getAppDeps();
 
@@ -488,7 +497,7 @@ export default function Feed() {
           keyExtractor={feedRowKey}
           stickySectionHeadersEnabled={false}
           ListHeaderComponent={listHeader}
-          contentContainerStyle={{ paddingBottom: LIST_BOTTOM_INSET, gap: theme.space.md }}
+          contentContainerStyle={{ paddingBottom: listBottomInset, gap: theme.space.md }}
           renderSectionHeader={({ section }) => <MonthHeader section={section} currencyCode={ctx.currencyCode} />}
           renderItem={({ item }) => (
             <FeedRhythmRow row={item} onPress={(date) => router.push(`/date/${date.id}`)} />
@@ -507,7 +516,7 @@ export default function Feed() {
           data={monthRows}
           keyExtractor={feedRowKey}
           ListHeaderComponent={listHeader}
-          contentContainerStyle={{ paddingBottom: LIST_BOTTOM_INSET, gap: theme.space.md }}
+          contentContainerStyle={{ paddingBottom: listBottomInset, gap: theme.space.md }}
           renderItem={({ item }) => (
             <FeedRhythmRow row={item} onPress={(date) => router.push(`/date/${date.id}`)} />
           )}
