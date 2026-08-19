@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { db } from '@/db/client';
+import { dailyCovers } from '@/domain/analytics/covers';
 import { dailySpend } from '@/domain/analytics/daily';
 import { shiftMonth } from '@/domain/analytics/period';
 import { toFeedDate, type FeedDate } from '@/domain/dates/repository';
@@ -179,6 +180,14 @@ export default function Feed() {
     [periodMonth, ctx, draftRows, publishedRows],
   );
 
+  // Same rationale as heatDays: a plain read riding the live queries'
+  // reactivity, converted once to a by-day map since the grid wants lookup
+  // by day and dailyCovers returns an array.
+  const covers = useMemo(
+    () => new Map(dailyCovers(db, ctx, periodMonth).map((c) => [c.occurredOn, c.coverUri])),
+    [periodMonth, ctx, draftRows, publishedRows],
+  );
+
   const attachPhotoToLatestQueued = async () => {
     if (attachingPhoto) return;
     const latest = queuedStops[0];
@@ -342,6 +351,7 @@ export default function Feed() {
             periodMonth={periodMonth}
             todayLocal={todayLocal}
             days={heatDays}
+            covers={covers}
             selectedDay={effectiveSelectedDay}
             onSelectDay={(day) => setSelectedDay((cur) => (cur === day ? null : day))}
             onStepMonth={(delta) => setPeriodMonth((p) => shiftMonth(p, delta))}

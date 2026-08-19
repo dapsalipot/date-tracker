@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 import type { DaySpend } from '@/domain/analytics/daily';
 import { Card } from '@/ui/Card';
 import { isStopKind } from '@/ui/KindIcon';
@@ -93,6 +93,8 @@ interface Props {
   todayLocal: string;
   /** Sparse — only days with spend. The grid draws every cell itself. */
   days: DaySpend[];
+  /** Sparse — only days with a cover photo. Present beats the spend tint/dot. */
+  covers: ReadonlyMap<string, string>;
   selectedDay: string | null;
   onSelectDay: (day: string) => void;
   onStepMonth: (delta: number) => void;
@@ -102,7 +104,7 @@ interface Props {
 /** A month at a glance: heat-tinted by spend, a dot for what the day was
  * mostly about, no amounts — the list below carries that detail. */
 export function CalendarGrid({
-  periodMonth, todayLocal, days, selectedDay, onSelectDay, onStepMonth, canStepForward,
+  periodMonth, todayLocal, days, covers, selectedDay, onSelectDay, onStepMonth, canStepForward,
 }: Props) {
   const t = useTheme();
   const weeks = useMemo(() => buildWeeks(periodMonth), [periodMonth]);
@@ -140,9 +142,11 @@ export function CalendarGrid({
               if (iso === null) return <View key={`blank-${i}-${j}`} style={{ flex: 1, aspectRatio: 1 }} />;
 
               const spend = byDay.get(iso);
+              const coverUri = covers.get(iso);
               const dayNum = Number.parseInt(iso.slice(8, 10), 10);
               const isToday = iso === todayLocal;
               const isSelected = iso === selectedDay;
+              const hasCover = coverUri !== undefined;
               const tint = spend !== undefined && maxSpend > 0
                 ? withAlpha(t.role.primary, MIN_ALPHA + (spend.totalMinor / maxSpend) * (MAX_ALPHA - MIN_ALPHA))
                 : 'transparent';
@@ -160,29 +164,53 @@ export function CalendarGrid({
                     style={{
                       flex: 1,
                       borderRadius: theme.radius.sm,
-                      backgroundColor: tint,
-                      borderWidth: isSelected ? 1.5 : 0,
-                      borderColor: t.role.ink,
+                      // Clips the photo to the rounded cell; the border below is
+                      // drawn on this same box's own edge, which overflow:hidden
+                      // never touches — only children (the photo) get cut, so
+                      // today's accent ring sits outside the photo and survives it.
+                      overflow: hasCover ? 'hidden' : 'visible',
+                      backgroundColor: hasCover ? 'transparent' : tint,
+                      borderWidth: isSelected ? 1.5 : hasCover && isToday ? 2 : 0,
+                      borderColor: isSelected ? t.role.ink : t.role.primary,
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 2,
                     }}
                   >
-                    <View
-                      style={
-                        isToday
-                          ? {
-                              minWidth: 20, height: 20, paddingHorizontal: 2, borderRadius: 10,
-                              backgroundColor: t.role.primary, alignItems: 'center', justifyContent: 'center',
-                            }
-                          : { alignItems: 'center', justifyContent: 'center' }
-                      }
-                    >
-                      <Text style={{ ...theme.type.meta, color: isToday ? t.role.onPrimary : t.role.ink }}>
-                        {dayNum}
-                      </Text>
-                    </View>
-                    <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: dotColor }} />
+                    {hasCover ? (
+                      <>
+                        <Image
+                          source={{ uri: coverUri }}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="cover"
+                        />
+                        <View style={{
+                          position: 'absolute', minWidth: 18, height: 18, borderRadius: 9,
+                          alignItems: 'center', justifyContent: 'center',
+                          backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 4,
+                        }}>
+                          <Text style={{ ...theme.type.micro, color: '#FFFFFF', letterSpacing: 0 }}>{dayNum}</Text>
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <View
+                          style={
+                            isToday
+                              ? {
+                                  minWidth: 20, height: 20, paddingHorizontal: 2, borderRadius: 10,
+                                  backgroundColor: t.role.primary, alignItems: 'center', justifyContent: 'center',
+                                }
+                              : { alignItems: 'center', justifyContent: 'center' }
+                          }
+                        >
+                          <Text style={{ ...theme.type.meta, color: isToday ? t.role.onPrimary : t.role.ink }}>
+                            {dayNum}
+                          </Text>
+                        </View>
+                        <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: dotColor }} />
+                      </>
+                    )}
                   </View>
                 </Pressable>
               );
