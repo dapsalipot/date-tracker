@@ -1,4 +1,8 @@
+import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { describe, expect, it } from 'vitest';
+import * as schema from '@/db/schema';
+import type { AppDatabase } from '@/db/types';
 import { createTestDb, testDeps } from '@/test/testDb';
 import { readSetting, writeSetting, THEME_KEY } from './settings';
 
@@ -29,5 +33,14 @@ describe('settings', () => {
     writeSetting(db, DEPS, THEME_KEY, 'dark');
     writeSetting(db, DEPS, 'other', 'x');
     expect(readSetting(db, THEME_KEY)).toBe('dark');
+  });
+
+  it('returns null rather than throwing when app_settings does not exist yet', () => {
+    // No migrate() call: the table genuinely is not there, reproducing what
+    // ThemeProvider hits reading the theme before useMigrations resolves.
+    const sqlite = new Database(':memory:');
+    const db = drizzle(sqlite, { schema }) as unknown as AppDatabase;
+    expect(() => readSetting(db, THEME_KEY)).not.toThrow();
+    expect(readSetting(db, THEME_KEY)).toBeNull();
   });
 });
