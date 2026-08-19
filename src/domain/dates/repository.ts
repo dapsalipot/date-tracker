@@ -48,9 +48,21 @@ export interface FeedDate {
   totalMinor: number;
   currencyCode: string;
   coverUri: string | null;
-  /** Distinct kinds on this date, sorted. The feed renders these as chips. */
+  /**
+   * Distinct kinds on this date, sorted. `FeedCard` renders `kindSequence`
+   * (below) instead — this kept for parity with the raw query and for
+   * consumers that want the deduped set rather than the ordered timeline.
+   */
   kinds: readonly string[];
-  /** Distinct place names on this date, sorted. */
+  /**
+   * Every stop's kind, in stop order, duplicates included — "the shape of the
+   * evening at a glance" (spec §8). Unlike `kinds`, this is not deduped or
+   * sorted: a dinner → gig → late-night-food evening stays `[food, activity,
+   * food]`, not the sorted, distinct `[activity, food]` `kinds` gives. This is
+   * what the feed's icon row renders.
+   */
+  kindSequence: readonly string[];
+  /** Distinct place names on this date, in first-captured order. */
   places: readonly string[];
   /** Count of distinct people who paid for a stop on this date. */
   payerCount: number;
@@ -165,18 +177,36 @@ export interface FeedDateRow {
   totalMinor: number;
   coverUri: string | null;
   kinds: string | null;
+  kindSequence: string | null;
   places: string | null;
   payerCount: number;
 }
 
 /**
- * Returns the query builder WITHOUT executing it. No screen subscribes to
- * this one with `useLiveQuery` any more — `app/index.tsx` uses
- * `draftDatesQuery`/`publishedDatesQuery` from `./drafts` instead. This stays
- * as the honest "all dates for the couple" read: `listFeedDates`, built on
- * it, is exercised directly by tests in this file and in `seed.test.ts`.
+ * SQLite forbids a custom `group_concat` separator alongside `DISTINCT`, so
+ * `places` and `kindSequence` below (neither deduped in SQL — see
+ * `toFeedDate`) join on `char(31)` — the ASCII unit separator — instead of a
+ * comma. A comma can't be used there: place names are free text (`Bo's
+ * Coffee, BGC` would split into two places), unlike `kinds`, which stays
+ * comma-joined because it's a closed enum. Matched by `GROUP_CONCAT_SEP`
+ * below when splitting the result back apart.
  */
-export function feedDatesQuery(db: AppDatabase, scope: CoupleScope) {
+export const GROUP_CONCAT_SEP = '\x1F';
+
+/**
+ * The select + joins shared by `feedDatesQuery` here and `drafts.ts`'s
+ * `scopedQuery` — one couple's dates with their stop aggregates. Kept as one
+ * builder because two independently hand-maintained copies already produced
+ * a near-miss: a field added to one and not the other ships `undefined` at
+ * runtime with a green suite, since nothing type-checks a raw SQL column list
+ * against `FeedDateRow`.
+ *
+ * `status`, left undefined, returns every status (`feedDatesQuery`'s use);
+ * passed, scopes to just that status (`scopedQuery`'s use). Callers add their
+ * own `.orderBy()` — draft and published feeds sort oldest/newest first
+ * respectively.
+ */
+export function feedDateSelection(db: AppDatabase, scope: CoupleScope, status?: string) {
   return db
     .select({
       id: dates.id,
@@ -187,7 +217,11 @@ export function feedDatesQuery(db: AppDatabase, scope: CoupleScope) {
       stopCount: sql<number>`count(${stops.id})`,
       totalMinor: sql<number>`coalesce(sum(${stops.amountMinor}), 0)`,
       kinds: sql<string | null>`group_concat(distinct ${stops.kind})`,
-      places: sql<string | null>`group_concat(distinct ${stops.placeName})`,
+      // Ordered and not distinct: "the stop timeline as a row of kind icons
+      // in stop order" (spec §8) needs repeats and sequence, which `kinds`
+      // (distinct, alphabetically sorted) throws away.
+      kindSequence: sql<string | null>`group_concat(${stops.kind}, char(31) order by ${stops.sortOrder})`,
+      places: sql<string | null>`group_concat(${stops.placeName}, char(31))`,
       payerCount: sql<number>`count(distinct ${stops.paidByUserId})`,
     })
     .from(dates)
@@ -206,9 +240,25 @@ export function feedDatesQuery(db: AppDatabase, scope: CoupleScope) {
     // deletedAt check belongs in the ON clause: in the WHERE it would turn
     // this into an inner join and drop every date that has no cover.
     .leftJoin(photos, and(eq(photos.id, dates.coverPhotoId), isNull(photos.deletedAt)))
-    .where(and(eq(dates.coupleId, scope.coupleId), isNull(dates.deletedAt)))
-    .groupBy(dates.id)
-    .orderBy(desc(dates.occurredOn));
+    .where(
+      and(
+        eq(dates.coupleId, scope.coupleId),
+        isNull(dates.deletedAt),
+        status !== undefined ? eq(dates.status, status) : undefined,
+      ),
+    )
+    .groupBy(dates.id);
+}
+
+/**
+ * Returns the query builder WITHOUT executing it. No screen subscribes to
+ * this one with `useLiveQuery` any more — `app/index.tsx` uses
+ * `draftDatesQuery`/`publishedDatesQuery` from `./drafts` instead. This stays
+ * as the honest "all dates for the couple" read: `listFeedDates`, built on
+ * it, is exercised directly by tests in this file and in `seed.test.ts`.
+ */
+export function feedDatesQuery(db: AppDatabase, scope: CoupleScope) {
+  return feedDateSelection(db, scope).orderBy(desc(dates.occurredOn));
 }
 
 export function toFeedDate(row: FeedDateRow, currencyCode: string): FeedDate {
@@ -223,7 +273,12 @@ export function toFeedDate(row: FeedDateRow, currencyCode: string): FeedDate {
     coverUri: row.coverUri,
     // group_concat's order is unspecified, so sort for a stable chip order.
     kinds: row.kinds === null ? [] : row.kinds.split(',').sort(),
-    places: row.places === null ? [] : row.places.split(',').sort(),
+    kindSequence: row.kindSequence === null ? [] : row.kindSequence.split(GROUP_CONCAT_SEP),
+    // Not deduped in SQL (DISTINCT can't share a custom separator with a
+    // free-text field — see GROUP_CONCAT_SEP), so dedupe here instead. A Set
+    // preserves first-seen order, unlike a sort, which would reorder places
+    // alphabetically for no reason a user asked for.
+    places: row.places === null ? [] : [...new Set(row.places.split(GROUP_CONCAT_SEP))],
     payerCount: Number(row.payerCount),
   };
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { theme } from './theme';
 import { STOP_KINDS } from '@/domain/stops/taxonomy';
 import { contrastRatio } from './contrast';
+import { REGISTERED_FONTS } from './fonts';
 import { darkTheme, lightTheme, themes, type Theme } from './themes';
 
 describe('type scale', () => {
@@ -45,6 +46,16 @@ describe('type scale', () => {
     for (const [name, step] of Object.entries(theme.type)) {
       if (name === 'micro') continue;
       expect(step.letterSpacing).toBe(0);
+    }
+  });
+
+  it('names only fonts that app/_layout.tsx actually registers with useFonts', () => {
+    // Nothing type-checks a raw fontFamily string against what useFonts loads
+    // — a typo or a repoint to an unregistered-but-real package export (e.g.
+    // Nunito_900Black) compiles fine and every other test stays green, and
+    // every heading silently falls back to the system font on device.
+    for (const [name, step] of Object.entries(theme.type)) {
+      expect(REGISTERED_FONTS.includes(step.fontFamily), `theme.type.${name}.fontFamily = "${step.fontFamily}"`).toBe(true);
     }
   });
 

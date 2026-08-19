@@ -16,12 +16,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [name, setName] = useState<ThemeName>(storedName);
 
   const toggle = useCallback(() => {
-    setName((current) => {
-      const next: ThemeName = current === 'light' ? 'dark' : 'light';
-      writeSetting(db, getAppDeps(), THEME_KEY, next);
-      return next;
-    });
-  }, []);
+    // The write lives here, in the callback body, rather than inside the
+    // setName updater above it — React (under StrictMode) invokes a state
+    // updater function twice to surface side effects, and a write inside one
+    // would fire twice per tap. The upsert in writeSetting makes a double
+    // write idempotent rather than wrong, but there's no reason to rely on
+    // that when the fix is just not putting it there.
+    const next: ThemeName = name === 'light' ? 'dark' : 'light';
+    setName(next);
+    writeSetting(db, getAppDeps(), THEME_KEY, next);
+  }, [name]);
 
   const value = useMemo(() => ({ theme: themes[name], toggle }), [name, toggle]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

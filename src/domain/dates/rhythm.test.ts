@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import type { FeedDate } from './repository';
 import { buildFeedRows, splitHero } from './rhythm';
 
-const d = (id: string, occurredOn: string, status = 'published') =>
-  ({ id, occurredOn, status, title: null, stopCount: 1, totalMinor: 1, currencyCode: 'PHP',
-     coverUri: null, kinds: [] }) as never;
+// A properly typed fixture, not `as never`: that cast switched off type
+// checking exactly where FeedDate's fields are threaded through, so adding a
+// required field to FeedDate (as `kindSequence` was) wouldn't fail this file
+// even though every call site here would then be building an incomplete row.
+const d = (id: string, occurredOn: string, status = 'published'): FeedDate => ({
+  id, occurredOn, status, title: null, stopCount: 1, totalMinor: 1, currencyCode: 'PHP',
+  coverUri: null, kinds: [], kindSequence: [], places: [], payerCount: 1,
+});
 
 describe('splitHero', () => {
   it('promotes the newest published date', () => {

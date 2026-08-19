@@ -1,9 +1,15 @@
-const family = {
+import type { RegisteredFont } from './fonts';
+
+// Typed against `RegisteredFont`, not `as const`: a typo or a rename here
+// (e.g. to a real @expo-google-fonts/nunito export that `app/_layout.tsx`
+// doesn't register) fails `tsc` instead of silently falling back to the
+// system font on device — see fonts.ts.
+const family: Record<'regular' | 'semi' | 'bold' | 'extra', RegisteredFont> = {
   regular: 'Nunito_400Regular',
   semi: 'Nunito_600SemiBold',
   bold: 'Nunito_700Bold',
   extra: 'Nunito_800ExtraBold',
-} as const;
+};
 
 const type = {
   display: { fontSize: 34, lineHeight: 38, letterSpacing: 0, fontFamily: family.extra },

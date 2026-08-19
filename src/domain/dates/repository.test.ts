@@ -348,6 +348,59 @@ describe('listFeedDates', () => {
     expect(aug3?.payerCount).toBe(2);
   });
 
+  it('keeps a place name containing a comma as one place, not two', () => {
+    // Place names are free text (unlike kinds, a closed enum), so joining
+    // them on a comma would split "Bo's Coffee, BGC" into two places. The
+    // query joins on char(31) instead precisely to avoid this.
+    const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+
+    captureStop(db, AUG_3, {
+      coupleId, userId, kind: 'food', amountMinor: 10000, currencyCode: 'PHP', placeName: "Bo's Coffee, BGC",
+    });
+
+    const feed = listFeedDates(db, scope);
+
+    expect(feed[0]?.places).toEqual(["Bo's Coffee, BGC"]);
+  });
+
+  it('still collapses duplicate place names once DISTINCT is dropped from the query', () => {
+    // group_concat can't combine DISTINCT with a custom separator, so the
+    // dedup now happens in toFeedDate instead of in SQL — this proves that
+    // path still collapses repeats rather than listing "Cafe Ysabel" twice.
+    const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+
+    captureStop(db, AUG_3, {
+      coupleId, userId, kind: 'food', amountMinor: 10000, currencyCode: 'PHP', placeName: 'Cafe Ysabel',
+    });
+    captureStop(db, AUG_3, {
+      coupleId, userId, kind: 'activity', amountMinor: 20000, currencyCode: 'PHP', placeName: 'Cafe Ysabel',
+    });
+
+    const feed = listFeedDates(db, scope);
+
+    expect(feed[0]?.places).toEqual(['Cafe Ysabel']);
+  });
+
+  it('returns every stop\'s kind in stop order, repeats included', () => {
+    // Spec §8: the timeline is the shape of the evening, so a dinner -> gig
+    // -> late-night-food date must come back as [food, activity, food], not
+    // the distinct, alphabetically sorted [activity, food] `kinds` gives.
+    const { db, coupleId, userId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+
+    captureStop(db, AUG_3, { coupleId, userId, kind: 'food', amountMinor: 1000, currencyCode: 'PHP' });
+    captureStop(db, AUG_3, { coupleId, userId, kind: 'activity', amountMinor: 2000, currencyCode: 'PHP' });
+    captureStop(db, AUG_3, { coupleId, userId, kind: 'food', amountMinor: 3000, currencyCode: 'PHP' });
+
+    const feed = listFeedDates(db, scope);
+
+    expect(feed[0]?.kindSequence).toEqual(['food', 'activity', 'food']);
+    // Chips still see the distinct, sorted set.
+    expect(feed[0]?.kinds).toEqual(['activity', 'food']);
+  });
+
   it('carries the cover photo uri onto the feed card', () => {
     const { db, coupleId, userId } = setup();
     const scope = { coupleId, currencyCode: 'PHP' };

@@ -25,6 +25,14 @@ const TREND_CHART_HEIGHT = 80;
 /** A zero-spend month still gets a visible sliver — the gap is the point. */
 const TREND_MIN_SLIVER = 3;
 const TOP_PLACES_LIMIT = 5;
+/**
+ * Reserves room at the row's right edge for the theme toggle, which sits in
+ * its own absolutely-positioned corner rather than as a fourth flex item —
+ * see the month stepper below. Without this the `›` step control and the
+ * toggle icon would land on top of each other, both flush against the same
+ * right inset.
+ */
+const THEME_TOGGLE_GUTTER = 28;
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -101,28 +109,49 @@ export default function Dashboard() {
             borderBottomRightRadius: theme.radius.lg,
             paddingHorizontal: theme.screenMargin,
             paddingVertical: theme.space.md,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
           }}
         >
-          <Pressable onPress={() => step(-1)} hitSlop={12}>
-            <Text style={{ ...theme.type.title, color: t.role.ink }}>‹</Text>
-          </Pressable>
-          <Text style={{ ...theme.type.title, color: t.role.ink }}>
-            {formatPeriodMonth(periodMonth)}
-          </Text>
-          <Pressable onPress={() => step(1)} disabled={periodMonth === currentMonth} hitSlop={12}>
-            <Text
-              style={{
-                ...theme.type.title,
-                color: periodMonth === currentMonth ? t.role.line : t.role.ink,
-              }}
-            >
-              ›
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingRight: THEME_TOGGLE_GUTTER,
+            }}
+          >
+            <Pressable onPress={() => step(-1)} hitSlop={12}>
+              <Text style={{ ...theme.type.title, color: t.role.ink }}>‹</Text>
+            </Pressable>
+            <Text style={{ ...theme.type.title, color: t.role.ink }}>
+              {formatPeriodMonth(periodMonth)}
             </Text>
-          </Pressable>
-          <Pressable onPress={toggleTheme} hitSlop={12}>
+            <Pressable onPress={() => step(1)} disabled={periodMonth === currentMonth} hitSlop={12}>
+              <Text
+                style={{
+                  ...theme.type.title,
+                  color: periodMonth === currentMonth ? t.role.line : t.role.ink,
+                }}
+              >
+                ›
+              </Text>
+            </Pressable>
+          </View>
+          {/*
+            Its own absolutely-positioned corner, not a fourth child of the
+            row above: a fourth item in a `space-between` row pushes the
+            month label off centre instead of keeping `‹ Month ›` centred.
+          */}
+          <Pressable
+            onPress={toggleTheme}
+            hitSlop={12}
+            style={{
+              position: 'absolute',
+              right: theme.screenMargin,
+              top: theme.space.md,
+              bottom: theme.space.md,
+              justifyContent: 'center',
+            }}
+          >
             <Ionicons name={t.name === 'light' ? 'moon-outline' : 'sunny-outline'} size={20} color={t.role.ink} />
           </Pressable>
         </View>

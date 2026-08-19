@@ -14,8 +14,20 @@ import * as SplashScreen from 'expo-splash-screen';
 import migrations from '../drizzle/migrations';
 import { migrationDb } from '@/db/client';
 import { Card } from '@/ui/Card';
+import type { RegisteredFont } from '@/ui/fonts';
 import { theme } from '@/ui/theme';
 import { ThemeProvider, useTheme } from '@/ui/ThemeProvider';
+
+// Keyed by `RegisteredFont`, not a bare object: adding or renaming a weight
+// here without updating fonts.ts's `REGISTERED_FONTS` (or vice versa) is a
+// missing/excess-property error, not a silent mismatch with theme.ts's
+// tokens.
+const FONT_ASSETS: Record<RegisteredFont, number> = {
+  Nunito_400Regular,
+  Nunito_600SemiBold,
+  Nunito_700Bold,
+  Nunito_800ExtraBold,
+};
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -81,12 +93,7 @@ function AppGate() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
-    Nunito_400Regular,
-    Nunito_600SemiBold,
-    Nunito_700Bold,
-    Nunito_800ExtraBold,
-  });
+  const [fontsLoaded] = useFonts(FONT_ASSETS);
 
   useEffect(() => {
     // Holding the splash until the font resolves avoids a flash of system font

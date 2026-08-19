@@ -174,11 +174,20 @@ export default function Compose() {
               );
             })}
 
-            <Card padded={false} onPress={() => { void addPhoto(); }}>
+            {/*
+              A plain bordered View, not a Card: Card now draws a hairline
+              border and (in light mode) a lift shadow, and this tile sits
+              inside the PHOTOS Card already — nesting one inside the other
+              would draw a border and shadow within a border and shadow.
+            */}
+            <Pressable onPress={() => { void addPhoto(); }}>
               <View
                 style={{
                   width: PHOTO_WIDTH,
                   height: PHOTO_HEIGHT,
+                  borderRadius: theme.radius.md,
+                  borderWidth: 1,
+                  borderColor: t.role.line,
                   alignItems: 'center',
                   justifyContent: 'center',
                   opacity: adding ? 0.4 : 1,
@@ -186,7 +195,7 @@ export default function Compose() {
               >
                 <Ionicons name="images-outline" size={24} color={t.role.inkMuted} />
               </View>
-            </Card>
+            </Pressable>
           </ScrollView>
           <Text style={{ ...theme.type.meta, color: t.role.inkMuted, marginTop: theme.space.sm }}>
             Tap to set the cover · hold to remove

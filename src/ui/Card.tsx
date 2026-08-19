@@ -5,10 +5,29 @@ import { theme } from './theme';
 import { useTheme } from './ThemeProvider';
 import { tap } from './feedback';
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+/**
+ * Shared with `FeedHero`, which needs the same press feedback but forks the
+ * rest of the surface (full-bleed photo, no mat) — see `src/render/FeedCard.tsx`.
+ * Sharing this instead of letting the hero reimplement it is what keeps that
+ * fork from also silently drifting out of animation sync with every other card.
+ */
+export const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /** The paper border around a print. 6pt reads as a mat; less reads as a mistake. */
 const MAT_INSET = 6;
+
+/** The 0.985 press-scale every card in the feed uses, `Card` included. */
+export function usePressScale() {
+  const pressed = useSharedValue(0);
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: withTiming(pressed.value === 1 ? 0.985 : 1, { duration: theme.motion.fast }) }],
+  }));
+  return {
+    animatedStyle,
+    onPressIn: () => { pressed.value = 1; },
+    onPressOut: () => { pressed.value = 0; },
+  };
+}
 
 /**
  * The raised surface this direction is built on. Hairline border defines the card
@@ -29,21 +48,26 @@ export function Card({
   photoHeight?: number;
 }) {
   const t = useTheme();
-  const pressed = useSharedValue(0);
-  const animated = useAnimatedStyle(() => ({
-    transform: [{ scale: withTiming(pressed.value === 1 ? 0.985 : 1, { duration: theme.motion.fast }) }],
-  }));
+  const { animatedStyle, onPressIn, onPressOut } = usePressScale();
 
-  const surface = {
+  // overflow: 'hidden' sets masksToBounds on iOS, which clips a layer's own
+  // shadow along with its children. Split the lift onto an outer wrapper and
+  // keep the clip (radius, border, background, overflow) on an inner view so
+  // the shadow can render outside the clipped bounds.
+  const lift = {
+    borderRadius: theme.radius.lg,
+    // Null in dark by design — a shadow on a near-black ground is invisible and
+    // a glow standing in for one reads as a rendering bug.
+    ...(t.lift ?? {}),
+  };
+
+  const clip = {
     backgroundColor: t.role.surface,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: t.role.line,
     overflow: 'hidden' as const,
     padding: padded ? theme.space.md : 0,
-    // Null in dark by design — a shadow on a near-black ground is invisible and
-    // a glow standing in for one reads as a rendering bug.
-    ...(t.lift ?? {}),
   };
 
   const content = (
@@ -63,16 +87,22 @@ export function Card({
     </>
   );
 
-  if (onPress === undefined) return <View style={surface}>{content}</View>;
+  if (onPress === undefined) {
+    return (
+      <View style={lift}>
+        <View style={clip}>{content}</View>
+      </View>
+    );
+  }
 
   return (
     <AnimatedPressable
-      onPressIn={() => { pressed.value = 1; }}
-      onPressOut={() => { pressed.value = 0; }}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       onPress={() => { tap(); onPress(); }}
-      style={[surface, animated]}
+      style={[lift, animatedStyle]}
     >
-      {content}
+      <View style={clip}>{content}</View>
     </AnimatedPressable>
   );
 }

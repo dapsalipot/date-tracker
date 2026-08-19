@@ -1,7 +1,7 @@
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import type { FeedDate } from '@/domain/dates/repository';
 import { formatMoney, money } from '@/domain/money/money';
-import { Card } from '@/ui/Card';
+import { AnimatedPressable, Card, usePressScale } from '@/ui/Card';
 import { KindIcon } from '@/ui/KindIcon';
 import { ON_PHOTO, ON_PHOTO_MUTED, PHOTO_SCRIM } from '@/ui/photoOverlay';
 import { theme } from '@/ui/theme';
@@ -81,10 +81,18 @@ export function FeedCard({ date, onPress }: Props) {
           {formatDateLabel(date.occurredOn)} · {stopLabel}
         </Text>
 
-        {date.kinds.length > 0 && (
+        {/*
+          Spec §8: the stop timeline as icons in stop order — the shape of
+          the evening. `kindSequence` is ordered and not deduped, so this can
+          render `[food, activity, food]` for a dinner -> gig -> late-night-
+          food evening; `date.kinds` (distinct, alphabetically sorted) would
+          collapse that to `[activity, food]` and lose both the order and the
+          repetition. Keyed by index since the same kind can repeat.
+        */}
+        {date.kindSequence.length > 0 && (
           <View style={{ flexDirection: 'row', gap: theme.space.xs, marginTop: theme.space.sm }}>
-            {date.kinds.map((kind) => (
-              <KindIcon key={kind} kind={kind} size={13} />
+            {date.kindSequence.map((kind, index) => (
+              <KindIcon key={`${kind}-${index}`} kind={kind} size={13} />
             ))}
           </View>
         )}
@@ -118,6 +126,7 @@ export function FeedCard({ date, onPress }: Props) {
  */
 export function FeedHero({ date, onPress }: Props) {
   const t = useTheme();
+  const { animatedStyle, onPressIn, onPressOut } = usePressScale();
   const total = formatMoney(money(date.totalMinor, date.currencyCode));
   const stopLabel = date.stopCount === 1 ? '1 stop' : `${date.stopCount} stops`;
   const hasCover = date.coverUri !== null;
@@ -140,34 +149,48 @@ export function FeedHero({ date, onPress }: Props) {
   );
 
   return (
-    <Pressable
+    <AnimatedPressable
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       onPress={() => { tap(); onPress(); }}
-      style={{
-        // Same radius as every other card — the hero is bigger, not a
-        // different shape.
-        borderRadius: theme.radius.lg,
-        overflow: 'hidden',
-        backgroundColor: t.role.surface,
-        borderWidth: 1,
-        borderColor: t.role.line,
-        ...(t.lift ?? {}),
-      }}
+      style={[
+        {
+          // Same radius as every other card — the hero is bigger, not a
+          // different shape. overflow: 'hidden' clips masksToBounds' own
+          // shadow along with its children on iOS, so the lift lives on this
+          // outer, unclipped view and the clip (radius/border/background) on
+          // an inner one — see Card.tsx for the same split.
+          borderRadius: theme.radius.lg,
+          ...(t.lift ?? {}),
+        },
+        animatedStyle,
+      ]}
     >
-      {hasCover ? (
-        <View style={{ width: '100%', aspectRatio: HERO_ASPECT }}>
-          <Image source={{ uri: date.coverUri as string }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-          <View
-            style={{
-              position: 'absolute', left: 0, right: 0, bottom: 0,
-              padding: theme.space.md, backgroundColor: PHOTO_SCRIM,
-            }}
-          >
-            {caption}
+      <View
+        style={{
+          borderRadius: theme.radius.lg,
+          overflow: 'hidden',
+          backgroundColor: t.role.surface,
+          borderWidth: 1,
+          borderColor: t.role.line,
+        }}
+      >
+        {hasCover ? (
+          <View style={{ width: '100%', aspectRatio: HERO_ASPECT }}>
+            <Image source={{ uri: date.coverUri as string }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            <View
+              style={{
+                position: 'absolute', left: 0, right: 0, bottom: 0,
+                padding: theme.space.md, backgroundColor: PHOTO_SCRIM,
+              }}
+            >
+              {caption}
+            </View>
           </View>
-        </View>
-      ) : (
-        <View style={{ padding: theme.space.md }}>{caption}</View>
-      )}
-    </Pressable>
+        ) : (
+          <View style={{ padding: theme.space.md }}>{caption}</View>
+        )}
+      </View>
+    </AnimatedPressable>
   );
 }

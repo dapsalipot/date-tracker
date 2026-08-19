@@ -5,20 +5,29 @@ import type { Deps } from '@/domain/deps';
 
 export const THEME_KEY = 'theme';
 
+/**
+ * "Table not there yet" looks different depending on the driver — better-
+ * sqlite3 (the test driver) sets `err.code === 'SQLITE_ERROR'`, while
+ * expo-sqlite (what actually ships) sets `err.code === 'ERR_INTERNAL_SQLITE_ERROR'`.
+ * The message is the one thing both agree on, so match on that instead of
+ * `code`. Narrow on purpose: any other database error must still throw,
+ * since swallowing those could hide real corruption.
+ */
+export function isMissingTableError(err: unknown): boolean {
+  return err instanceof Error && /no such table/i.test(err.message);
+}
+
 export function readSetting(db: AppDatabase, key: string): string | null {
   // ThemeProvider calls this on mount, which can land before migrations have
   // necessarily finished running (useMigrations's `success` flag starts
   // false and the app_settings table may not exist yet on that first
   // render). Treat "table not there yet" as "nothing saved yet" rather than
-  // crashing — but only that specific failure; any other database error
-  // still throws, since swallowing those could hide real corruption.
+  // crashing.
   let rows: { value: string }[];
   try {
     rows = db.select().from(appSettings).where(eq(appSettings.key, key)).all();
   } catch (err) {
-    const isMissingTable =
-      err instanceof Error && 'code' in err && err.code === 'SQLITE_ERROR' && err.message.includes('no such table');
-    if (isMissingTable) return null;
+    if (isMissingTableError(err)) return null;
     throw err;
   }
   return rows[0]?.value ?? null;
