@@ -4,6 +4,7 @@ import { currencySymbol, minorExponent } from '@/domain/money/money';
 import { Card } from './Card';
 import { tap } from './feedback';
 import { theme } from './theme';
+import { useTheme } from './ThemeProvider';
 
 const ALL_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'] as const;
 
@@ -35,6 +36,7 @@ interface Props {
  * simply already on screen removes that whole class of delay.
  */
 export function AmountKeypad({ value, onChange, currencyCode, placeholder }: Props) {
+  const t = useTheme();
   // money.ts owns both facts (MINOR_EXPONENTS, SYMBOLS). Reading them here
   // instead of hardcoding "two decimals" and a PHP-only symbol is what stops
   // the keypad from accepting precision (e.g. "420.50" for JPY) that
@@ -81,7 +83,7 @@ export function AmountKeypad({ value, onChange, currencyCode, placeholder }: Pro
           fontWeight: '800',
           textAlign: 'center',
           paddingVertical: theme.space.md,
-          color: showingPlaceholder ? theme.role.inkMuted : theme.role.primary,
+          color: showingPlaceholder ? t.role.inkMuted : t.role.primary,
         }}
       >
         {showingPlaceholder ? placeholder : `${symbol}${value === '' ? '0' : value}`}
@@ -94,9 +96,9 @@ export function AmountKeypad({ value, onChange, currencyCode, placeholder }: Pro
             style={{ width: '33.33%', paddingVertical: theme.space.md, alignItems: 'center' }}
           >
             {key === '⌫' ? (
-              <Ionicons name="backspace-outline" size={22} color={theme.role.ink} />
+              <Ionicons name="backspace-outline" size={22} color={t.role.ink} />
             ) : (
-              <Text style={{ ...theme.type.title, fontWeight: '600', color: theme.role.ink }}>{key}</Text>
+              <Text style={{ ...theme.type.title, fontWeight: '600', color: t.role.ink }}>{key}</Text>
             )}
           </Pressable>
         ))}

@@ -4,6 +4,7 @@ import type { DaySpend } from '@/domain/analytics/daily';
 import { Card } from '@/ui/Card';
 import { isStopKind } from '@/ui/KindIcon';
 import { theme } from '@/ui/theme';
+import { useTheme } from '@/ui/ThemeProvider';
 import { tap } from '@/ui/feedback';
 
 const MONTH_NAMES = [
@@ -55,7 +56,7 @@ function weekdayOffset(year: number, month: number, day: number): number {
 }
 
 /** `#RRGGBB` + an opacity -> `rgba()`. The only colour math here; the hue
- * itself always comes from a `theme.role.*` token, never a new hardcoded one. */
+ * itself always comes from a `t.role.*` token, never a new hardcoded one. */
 function withAlpha(hex: string, alpha: number): string {
   const r = Number.parseInt(hex.slice(1, 3), 16);
   const g = Number.parseInt(hex.slice(3, 5), 16);
@@ -103,6 +104,7 @@ interface Props {
 export function CalendarGrid({
   periodMonth, todayLocal, days, selectedDay, onSelectDay, onStepMonth, canStepForward,
 }: Props) {
+  const t = useTheme();
   const weeks = useMemo(() => buildWeeks(periodMonth), [periodMonth]);
   const byDay = useMemo(() => new Map(days.map((d) => [d.occurredOn, d])), [days]);
   const maxSpend = useMemo(() => Math.max(0, ...days.map((d) => d.totalMinor)), [days]);
@@ -111,13 +113,13 @@ export function CalendarGrid({
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Pressable onPress={() => { tap(); onStepMonth(-1); }} hitSlop={12}>
-          <Text style={{ ...theme.type.title, color: theme.role.ink }}>‹</Text>
+          <Text style={{ ...theme.type.title, color: t.role.ink }}>‹</Text>
         </Pressable>
-        <Text style={{ ...theme.type.title, color: theme.role.ink }}>
+        <Text style={{ ...theme.type.title, color: t.role.ink }}>
           {monthLabel(periodMonth).toUpperCase()}
         </Text>
         <Pressable onPress={() => { tap(); onStepMonth(1); }} disabled={!canStepForward} hitSlop={12}>
-          <Text style={{ ...theme.type.title, color: canStepForward ? theme.role.ink : theme.role.line }}>
+          <Text style={{ ...theme.type.title, color: canStepForward ? t.role.ink : t.role.line }}>
             ›
           </Text>
         </Pressable>
@@ -126,7 +128,7 @@ export function CalendarGrid({
       <View style={{ flexDirection: 'row', marginTop: theme.space.md }}>
         {WEEKDAY_LABELS.map((w) => (
           <View key={w} style={{ flex: 1, alignItems: 'center' }}>
-            <Text style={{ ...theme.type.micro, color: theme.role.inkMuted }}>{w}</Text>
+            <Text style={{ ...theme.type.micro, color: t.role.inkMuted }}>{w}</Text>
           </View>
         ))}
       </View>
@@ -142,10 +144,10 @@ export function CalendarGrid({
               const isToday = iso === todayLocal;
               const isSelected = iso === selectedDay;
               const tint = spend !== undefined && maxSpend > 0
-                ? withAlpha(theme.role.primary, MIN_ALPHA + (spend.totalMinor / maxSpend) * (MAX_ALPHA - MIN_ALPHA))
+                ? withAlpha(t.role.primary, MIN_ALPHA + (spend.totalMinor / maxSpend) * (MAX_ALPHA - MIN_ALPHA))
                 : 'transparent';
               const dotColor = spend !== undefined
-                ? (isStopKind(spend.dominantKind) ? theme.kind[spend.dominantKind] : theme.kind.other)
+                ? (isStopKind(spend.dominantKind) ? t.kind[spend.dominantKind] : t.kind.other)
                 : 'transparent';
 
               return (
@@ -160,7 +162,7 @@ export function CalendarGrid({
                       borderRadius: theme.radius.sm,
                       backgroundColor: tint,
                       borderWidth: isSelected ? 1.5 : 0,
-                      borderColor: theme.role.ink,
+                      borderColor: t.role.ink,
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 2,
@@ -171,12 +173,12 @@ export function CalendarGrid({
                         isToday
                           ? {
                               minWidth: 20, height: 20, paddingHorizontal: 2, borderRadius: 10,
-                              backgroundColor: theme.role.primary, alignItems: 'center', justifyContent: 'center',
+                              backgroundColor: t.role.primary, alignItems: 'center', justifyContent: 'center',
                             }
                           : { alignItems: 'center', justifyContent: 'center' }
                       }
                     >
-                      <Text style={{ ...theme.type.meta, color: isToday ? theme.role.onPrimary : theme.role.ink }}>
+                      <Text style={{ ...theme.type.meta, color: isToday ? t.role.onPrimary : t.role.ink }}>
                         {dayNum}
                       </Text>
                     </View>

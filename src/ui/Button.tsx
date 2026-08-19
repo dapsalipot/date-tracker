@@ -1,17 +1,27 @@
 import { Pressable, Text } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { theme } from './theme';
+import { useTheme } from './ThemeProvider';
+import type { Theme } from './themes';
 import { tap } from './feedback';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type Variant = 'primary' | 'quiet' | 'danger';
 
-const SURFACE: Record<Variant, { background: string; border: string; text: string }> = {
-  primary: { background: theme.role.primary, border: theme.role.primary, text: theme.role.onPrimary },
-  quiet: { background: 'transparent', border: theme.role.line, text: theme.role.ink },
-  danger: { background: 'transparent', border: 'transparent', text: theme.role.primary },
-};
+/**
+ * A pure function of `Theme` rather than a module-scope constant — it used to
+ * be a `SURFACE` object built from the role colours once at import time,
+ * which can't react to a theme switch. Called from the component body, where
+ * `t` comes from useTheme().
+ */
+function surfaceFor(t: Theme): Record<Variant, { background: string; border: string; text: string }> {
+  return {
+    primary: { background: t.role.primary, border: t.role.primary, text: t.role.onPrimary },
+    quiet: { background: 'transparent', border: t.role.line, text: t.role.ink },
+    danger: { background: 'transparent', border: 'transparent', text: t.role.primary },
+  };
+}
 
 /**
  * Press feedback lives here so motion is consistent by construction rather
@@ -29,8 +39,9 @@ export function Button({
   variant?: Variant;
   disabled?: boolean;
 }) {
+  const t = useTheme();
   const pressed = useSharedValue(0);
-  const surface = SURFACE[variant];
+  const surface = surfaceFor(t)[variant];
 
   const animated = useAnimatedStyle(() => ({
     transform: [{ scale: withTiming(pressed.value === 1 ? 0.97 : 1, { duration: theme.motion.fast }) }],

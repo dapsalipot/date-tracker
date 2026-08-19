@@ -15,12 +15,14 @@ import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { MicroLabel } from '@/ui/MicroLabel';
 import { theme } from '@/ui/theme';
+import { useTheme } from '@/ui/ThemeProvider';
 import { commit } from '@/ui/feedback';
 
 const PHOTO_WIDTH = 84;
 const PHOTO_HEIGHT = 105;
 
 export default function Compose() {
+  const t = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const deps = getAppDeps();
   const detail = useMemo(() => loadDateDetail(db, id), [id]);
@@ -33,9 +35,9 @@ export default function Compose() {
 
   if (!detail) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground, justifyContent: 'center', padding: theme.space.lg }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.role.ground, justifyContent: 'center', padding: theme.space.lg }}>
         <Card>
-          <Text style={{ ...theme.type.body, color: theme.role.ink, textAlign: 'center' }}>
+          <Text style={{ ...theme.type.body, color: t.role.ink, textAlign: 'center' }}>
             That date no longer exists.
           </Text>
         </Card>
@@ -103,7 +105,7 @@ export default function Compose() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.role.ground }}>
       <ScrollView contentContainerStyle={{ padding: theme.space.md, gap: theme.space.md }}>
         <Card>
           <MicroLabel>{detail.occurredOn.toUpperCase()}</MicroLabel>
@@ -111,12 +113,12 @@ export default function Compose() {
             value={title}
             onChangeText={setTitle}
             placeholder="Name this date"
-            placeholderTextColor={theme.role.inkMuted}
+            placeholderTextColor={t.role.inkMuted}
             // The receipt shrinks and then ellipsises an over-wide title, and
             // the exported filename is built from it. Cap it here so neither has
             // to rescue an essay.
             maxLength={60}
-            style={{ ...theme.type.title, color: theme.role.ink, paddingVertical: theme.space.sm }}
+            style={{ ...theme.type.title, color: t.role.ink, paddingVertical: theme.space.sm }}
           />
         </Card>
 
@@ -145,7 +147,7 @@ export default function Compose() {
                     borderRadius: theme.radius.md,
                     overflow: 'hidden',
                     borderWidth: isCover ? 2 : 1,
-                    borderColor: isCover ? theme.role.primary : theme.role.line,
+                    borderColor: isCover ? t.role.primary : t.role.line,
                   }}
                 >
                   {photo.localUri !== null && (
@@ -160,12 +162,12 @@ export default function Compose() {
                         width: 20,
                         height: 20,
                         borderRadius: 10,
-                        backgroundColor: theme.role.primary,
+                        backgroundColor: t.role.primary,
                         alignItems: 'center',
                         justifyContent: 'center',
                       }}
                     >
-                      <Ionicons name="star" size={12} color={theme.role.onPrimary} />
+                      <Ionicons name="star" size={12} color={t.role.onPrimary} />
                     </View>
                   )}
                 </Pressable>
@@ -182,11 +184,11 @@ export default function Compose() {
                   opacity: adding ? 0.4 : 1,
                 }}
               >
-                <Ionicons name="images-outline" size={24} color={theme.role.inkMuted} />
+                <Ionicons name="images-outline" size={24} color={t.role.inkMuted} />
               </View>
             </Card>
           </ScrollView>
-          <Text style={{ ...theme.type.meta, color: theme.role.inkMuted, marginTop: theme.space.sm }}>
+          <Text style={{ ...theme.type.meta, color: t.role.inkMuted, marginTop: theme.space.sm }}>
             Tap to set the cover · hold to remove
           </Text>
         </Card>

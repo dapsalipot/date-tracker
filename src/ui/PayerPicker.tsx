@@ -7,6 +7,7 @@ import { Card } from './Card';
 import { MicroLabel } from './MicroLabel';
 import { commit, tap } from './feedback';
 import { theme } from './theme';
+import { useTheme } from './ThemeProvider';
 
 interface Props {
   people: readonly Person[];
@@ -19,8 +20,8 @@ interface Props {
 const ADD_LABEL = 'Add someone';
 
 /**
- * "Who paid" chips, outlined in `theme.role.primary` when selected — never
- * `theme.kind.*`, since a payer isn't a stop kind. A single-person couple
+ * "Who paid" chips, outlined in `t.role.primary` when selected — never
+ * `t.kind.*`, since a payer isn't a stop kind. A single-person couple
  * would see a picker with nothing to pick between, so that case collapses to
  * a quiet add affordance instead of a one-chip row.
  *
@@ -39,6 +40,7 @@ const ADD_LABEL = 'Add someone';
  * platforms.
  */
 export function PayerPicker({ people, selected, onSelect, onAdd }: Props) {
+  const t = useTheme();
   const [asking, setAsking] = useState(false);
   const [draftName, setDraftName] = useState('');
 
@@ -67,30 +69,30 @@ export function PayerPicker({ people, selected, onSelect, onAdd }: Props) {
 
   const nameField = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.sm }}>
-      <Ionicons name="person-add-outline" size={16} color={theme.role.primary} />
+      <Ionicons name="person-add-outline" size={16} color={t.role.primary} />
       <TextInput
         value={draftName}
         onChangeText={setDraftName}
         placeholder="Their name"
-        placeholderTextColor={theme.role.inkMuted}
+        placeholderTextColor={t.role.inkMuted}
         autoFocus
         maxLength={40}
         returnKeyType="done"
         onSubmitEditing={() => { if (canConfirm) confirmName(); }}
         style={{
           ...theme.type.body,
-          color: theme.role.ink,
+          color: t.role.ink,
           flex: 1,
           paddingVertical: theme.space.xs,
           borderBottomWidth: 1,
-          borderBottomColor: theme.role.line,
+          borderBottomColor: t.role.line,
         }}
       />
       <Pressable onPress={() => setAsking(false)} hitSlop={8}>
-        <Text style={{ ...theme.type.meta, color: theme.role.inkMuted }}>Cancel</Text>
+        <Text style={{ ...theme.type.meta, color: t.role.inkMuted }}>Cancel</Text>
       </Pressable>
       <Pressable onPress={confirmName} disabled={!canConfirm} hitSlop={8}>
-        <Text style={{ ...theme.type.meta, fontWeight: '600', color: canConfirm ? theme.role.primary : theme.role.inkMuted }}>
+        <Text style={{ ...theme.type.meta, fontWeight: '600', color: canConfirm ? t.role.primary : t.role.inkMuted }}>
           Add
         </Text>
       </Pressable>
@@ -105,8 +107,8 @@ export function PayerPicker({ people, selected, onSelect, onAdd }: Props) {
         onPress={() => { tap(); promptForName(); }}
         style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.xs }}
       >
-        <Ionicons name="person-add-outline" size={14} color={theme.role.inkMuted} />
-        <Text style={{ ...theme.type.meta, color: theme.role.inkMuted }}>{ADD_LABEL}</Text>
+        <Ionicons name="person-add-outline" size={14} color={t.role.inkMuted} />
+        <Text style={{ ...theme.type.meta, color: t.role.inkMuted }}>{ADD_LABEL}</Text>
       </Pressable>
     );
   }
@@ -128,10 +130,10 @@ export function PayerPicker({ people, selected, onSelect, onAdd }: Props) {
               paddingVertical: theme.space.sm,
               borderRadius: 999,
               borderWidth: isSelected ? 1.5 : 1,
-              borderColor: isSelected ? theme.role.primary : theme.role.line,
+              borderColor: isSelected ? t.role.primary : t.role.line,
             }}
           >
-            <Text style={{ ...theme.type.meta, fontWeight: '600', color: isSelected ? theme.role.primary : theme.role.inkMuted }}>
+            <Text style={{ ...theme.type.meta, fontWeight: '600', color: isSelected ? t.role.primary : t.role.inkMuted }}>
               {person.displayName}
             </Text>
           </Pressable>
@@ -147,11 +149,11 @@ export function PayerPicker({ people, selected, onSelect, onAdd }: Props) {
           paddingVertical: theme.space.sm,
           borderRadius: 999,
           borderWidth: 1,
-          borderColor: theme.role.line,
+          borderColor: t.role.line,
         }}
       >
-        <Ionicons name="person-add-outline" size={14} color={theme.role.inkMuted} />
-        <Text style={{ ...theme.type.meta, color: theme.role.inkMuted }}>{ADD_LABEL}</Text>
+        <Ionicons name="person-add-outline" size={14} color={t.role.inkMuted} />
+        <Text style={{ ...theme.type.meta, color: t.role.inkMuted }}>{ADD_LABEL}</Text>
       </Pressable>
     </ScrollView>
   );

@@ -24,6 +24,7 @@ import { MicroLabel } from '@/ui/MicroLabel';
 import { PayerPicker } from '@/ui/PayerPicker';
 import { ReceiptReview } from '@/ui/ReceiptReview';
 import { theme } from '@/ui/theme';
+import { useTheme } from '@/ui/ThemeProvider';
 import { commit } from '@/ui/feedback';
 
 /**
@@ -34,6 +35,7 @@ import { commit } from '@/ui/feedback';
 const PHOTO_TILE = 58;
 
 export default function Capture() {
+  const t = useTheme();
   const deps = getAppDeps();
   const ctx = getLocalContext();
   const kinds = useMemo(() => kindsByRecentUse(db, ctx.coupleId), [ctx.coupleId]);
@@ -201,7 +203,7 @@ export default function Capture() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.role.ground }}>
       <View
         style={{
           flexDirection: 'row',
@@ -212,7 +214,7 @@ export default function Capture() {
         }}
       >
         <Button variant="quiet" label="Cancel" onPress={() => router.back()} />
-        <Text style={{ ...theme.type.meta, color: budget.isOverBudget ? theme.role.primary : theme.role.inkMuted }}>
+        <Text style={{ ...theme.type.meta, color: budget.isOverBudget ? t.role.primary : t.role.inkMuted }}>
           {remaining}
         </Text>
       </View>
@@ -235,8 +237,8 @@ export default function Capture() {
             {scanning ? (
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.sm }}>
-                  <ActivityIndicator color={theme.role.primary} />
-                  <Text style={{ ...theme.type.meta, color: theme.role.inkMuted }}>
+                  <ActivityIndicator color={t.role.primary} />
+                  <Text style={{ ...theme.type.meta, color: t.role.inkMuted }}>
                     Reading the receipt…
                   </Text>
                 </View>
@@ -294,7 +296,7 @@ export default function Capture() {
                   resizeMode="cover"
                 />
               ) : (
-                <Ionicons name="camera-outline" size={24} color={theme.role.inkMuted} />
+                <Ionicons name="camera-outline" size={24} color={t.role.inkMuted} />
               )}
             </View>
           </Card>

@@ -5,6 +5,7 @@ import { formatMoney, money } from '@/domain/money/money';
 import { Card } from './Card';
 import { MicroLabel } from './MicroLabel';
 import { theme } from './theme';
+import { useTheme } from './ThemeProvider';
 import { tap } from './feedback';
 
 /**
@@ -28,6 +29,7 @@ export function ReceiptReview({
   onToggleItem: (index: number) => void;
   onUseTotal: (amountMinor: number) => void;
 }) {
+  const t = useTheme();
   const show = (amountMinor: number) => formatMoney(money(amountMinor, currencyCode));
   // Bound once so the JSX below narrows properly. Reading receipt.totalMinor
   // inside the branch needs a cast, and a cast is how a null reaches formatMoney
@@ -38,8 +40,8 @@ export function ReceiptReview({
     return (
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.sm }}>
-          <Ionicons name="scan-outline" size={18} color={theme.role.inkMuted} />
-          <Text style={{ ...theme.type.meta, color: theme.role.inkMuted, flex: 1 }}>
+          <Ionicons name="scan-outline" size={18} color={t.role.inkMuted} />
+          <Text style={{ ...theme.type.meta, color: t.role.inkMuted, flex: 1 }}>
             Nothing readable on that photo. Type the amount instead — the photo is still attached.
           </Text>
         </View>
@@ -51,7 +53,7 @@ export function ReceiptReview({
     <Card>
       <View style={{ gap: theme.space.sm }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.xs }}>
-          <Ionicons name="receipt-outline" size={16} color={theme.role.primary} />
+          <Ionicons name="receipt-outline" size={16} color={t.role.primary} />
           <MicroLabel>READ FROM RECEIPT</MicroLabel>
         </View>
 
@@ -71,15 +73,15 @@ export function ReceiptReview({
               <Ionicons
                 name={isOn ? 'checkbox' : 'square-outline'}
                 size={20}
-                color={isOn ? theme.role.primary : theme.role.inkMuted}
+                color={isOn ? t.role.primary : t.role.inkMuted}
               />
               <Text
                 numberOfLines={1}
-                style={{ ...theme.type.body, color: isOn ? theme.role.ink : theme.role.inkMuted, flex: 1 }}
+                style={{ ...theme.type.body, color: isOn ? t.role.ink : t.role.inkMuted, flex: 1 }}
               >
                 {item.label}
               </Text>
-              <Text style={{ ...theme.type.body, color: isOn ? theme.role.ink : theme.role.inkMuted }}>
+              <Text style={{ ...theme.type.body, color: isOn ? t.role.ink : t.role.inkMuted }}>
                 {show(item.amountMinor)}
               </Text>
             </Pressable>
@@ -87,7 +89,7 @@ export function ReceiptReview({
         })}
 
         {totalMinor === null ? (
-          <Text style={{ ...theme.type.meta, color: theme.role.inkMuted }}>
+          <Text style={{ ...theme.type.meta, color: t.role.inkMuted }}>
             No total found — tick the items you want or type the amount.
           </Text>
         ) : (
@@ -98,13 +100,13 @@ export function ReceiptReview({
               alignItems: 'center',
               gap: theme.space.sm,
               borderTopWidth: 1,
-              borderTopColor: theme.role.line,
+              borderTopColor: t.role.line,
               paddingTop: theme.space.sm,
             }}
           >
-            <Ionicons name="arrow-up-circle" size={20} color={theme.role.primary} />
-            <Text style={{ ...theme.type.body, color: theme.role.ink, flex: 1 }}>Use total</Text>
-            <Text style={{ ...theme.type.title, color: theme.role.primary }}>
+            <Ionicons name="arrow-up-circle" size={20} color={t.role.primary} />
+            <Text style={{ ...theme.type.body, color: t.role.ink, flex: 1 }}>Use total</Text>
+            <Text style={{ ...theme.type.title, color: t.role.primary }}>
               {show(totalMinor)}
             </Text>
           </Pressable>

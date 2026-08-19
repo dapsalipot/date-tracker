@@ -4,6 +4,7 @@ import { formatMoney, money } from '@/domain/money/money';
 import { Card } from '@/ui/Card';
 import { isStopKind, KindIcon } from '@/ui/KindIcon';
 import { theme } from '@/ui/theme';
+import { useTheme } from '@/ui/ThemeProvider';
 
 const COVER_HEIGHT = 96;
 
@@ -54,6 +55,7 @@ interface Props {
  * component has no animation or gesture code of its own.
  */
 export function FeedCard({ date, onPress }: Props) {
+  const t = useTheme();
   const total = formatMoney(money(date.totalMinor, date.currencyCode));
   const stopLabel = date.stopCount === 1 ? '1 stop' : `${date.stopCount} stops`;
 
@@ -70,22 +72,22 @@ export function FeedCard({ date, onPress }: Props) {
       <View style={{ padding: theme.space.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
           <Text
-            style={{ ...theme.type.title, color: theme.role.ink, flex: 1, marginRight: theme.space.sm }}
+            style={{ ...theme.type.title, color: t.role.ink, flex: 1, marginRight: theme.space.sm }}
             numberOfLines={1}
           >
             {date.title ?? 'Untitled date'}
           </Text>
-          <Text style={{ ...theme.type.title, color: theme.role.ink }}>{total}</Text>
+          <Text style={{ ...theme.type.title, color: t.role.ink }}>{total}</Text>
         </View>
 
-        <Text style={{ ...theme.type.meta, color: theme.role.inkMuted, marginTop: theme.space.xs }}>
+        <Text style={{ ...theme.type.meta, color: t.role.inkMuted, marginTop: theme.space.xs }}>
           {formatDateLabel(date.occurredOn)} · {stopLabel}
         </Text>
 
         {date.kinds.length > 0 && (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.space.xs, marginTop: theme.space.sm }}>
             {date.kinds.map((kind) => {
-              const tint = isStopKind(kind) ? theme.kind[kind] : theme.kind.other;
+              const tint = isStopKind(kind) ? t.kind[kind] : t.kind.other;
               return (
                 <View
                   key={kind}

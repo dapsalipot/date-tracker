@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { STOP_KINDS, type StopKind } from '@/domain/stops/taxonomy';
-import { theme } from './theme';
+import { useTheme } from './ThemeProvider';
 
 type Glyph = ComponentProps<typeof Ionicons>['name'];
 
@@ -32,6 +32,7 @@ interface Props {
  * a coloured surface (e.g. inside a filled button) and needs to invert.
  */
 export function KindIcon({ kind, size = 16, color }: Props) {
+  const t = useTheme();
   const resolved = isStopKind(kind) ? kind : 'other';
-  return <Ionicons name={GLYPH[resolved]} size={size} color={color ?? theme.kind[resolved]} />;
+  return <Ionicons name={GLYPH[resolved]} size={size} color={color ?? t.kind[resolved]} />;
 }

@@ -13,6 +13,7 @@ import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { MicroLabel } from '@/ui/MicroLabel';
 import { theme } from '@/ui/theme';
+import { useTheme } from '@/ui/ThemeProvider';
 import { commit } from '@/ui/feedback';
 
 /**
@@ -33,6 +34,7 @@ const SIZES: readonly { size: ReceiptSize; label: string }[] = [
 const PREVIEW_MARGIN = theme.space.md * 2;
 
 export default function Share() {
+  const t = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const ctx = getLocalContext();
   const deps = getAppDeps();
@@ -83,9 +85,9 @@ export default function Share() {
 
   if (vm === null) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground, justifyContent: 'center', padding: theme.space.lg }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.role.ground, justifyContent: 'center', padding: theme.space.lg }}>
         <Card>
-          <Text style={{ ...theme.type.body, color: theme.role.ink, textAlign: 'center' }}>
+          <Text style={{ ...theme.type.body, color: t.role.ink, textAlign: 'center' }}>
             That date no longer exists.
           </Text>
         </Card>
@@ -94,7 +96,7 @@ export default function Share() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.role.ground }}>
       <ScrollView contentContainerStyle={{ padding: theme.space.md, gap: theme.space.md }}>
         {/*
           The canvas always renders at its true export size; only this box
@@ -110,7 +112,7 @@ export default function Share() {
             overflow: 'hidden',
             borderRadius: theme.radius.md,
             borderWidth: 1,
-            borderColor: theme.role.line,
+            borderColor: t.role.line,
             alignSelf: 'center',
           }}
         >
@@ -120,7 +122,7 @@ export default function Share() {
         </View>
 
         <Card>
-          <Text style={{ ...theme.type.meta, color: theme.role.inkMuted, textAlign: 'center' }}>
+          <Text style={{ ...theme.type.meta, color: t.role.inkMuted, textAlign: 'center' }}>
             {vm.stopCount === 1 ? '1 stop' : `${vm.stopCount} stops`} · {vm.occurredOn}
           </Text>
         </Card>
@@ -140,15 +142,15 @@ export default function Share() {
                     paddingVertical: theme.space.sm,
                     borderRadius: 999,
                     borderWidth: 1,
-                    borderColor: selected ? theme.role.primary : theme.role.line,
-                    backgroundColor: selected ? theme.role.primary : 'transparent',
+                    borderColor: selected ? t.role.primary : t.role.line,
+                    backgroundColor: selected ? t.role.primary : 'transparent',
                   }}
                 >
                   <Text
                     style={{
                       ...theme.type.meta,
                       fontWeight: '600',
-                      color: selected ? theme.role.onPrimary : theme.role.inkMuted,
+                      color: selected ? t.role.onPrimary : t.role.inkMuted,
                     }}
                   >
                     {option.label}
@@ -174,15 +176,15 @@ export default function Share() {
                     paddingVertical: theme.space.sm,
                     borderRadius: 999,
                     borderWidth: 1,
-                    borderColor: selected ? theme.role.primary : theme.role.line,
-                    backgroundColor: selected ? theme.role.primary : 'transparent',
+                    borderColor: selected ? t.role.primary : t.role.line,
+                    backgroundColor: selected ? t.role.primary : 'transparent',
                   }}
                 >
                   <Text
                     style={{
                       ...theme.type.meta,
                       fontWeight: '600',
-                      color: selected ? theme.role.onPrimary : theme.role.inkMuted,
+                      color: selected ? t.role.onPrimary : t.role.inkMuted,
                     }}
                   >
                     {option.label}

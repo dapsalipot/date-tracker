@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { theme } from './theme';
+import { useTheme } from './ThemeProvider';
 
 interface Segment {
   fraction: number;
@@ -26,7 +27,12 @@ const TRACK_HEIGHT = 10;
  * fills — one per segment, coloured by `segments[].color` — leaving any
  * unfilled remainder as bare track.
  */
-export function Bar({ label, value, fraction, tint = theme.role.primary, segments, onPress }: Props) {
+export function Bar({ label, value, fraction, tint, segments, onPress }: Props) {
+  const t = useTheme();
+  // Default lives here rather than in the parameter list: a default
+  // expression is evaluated before the body runs, with no access to `t`.
+  const resolvedTint = tint ?? t.role.primary;
+
   // Spend over budget, or a slice measured against the wrong reference total,
   // yields a fraction above 1 — clamp so the fill never outgrows its track.
   const width = `${Math.max(0, Math.min(1, fraction)) * 100}%` as const;
@@ -37,15 +43,15 @@ export function Bar({ label, value, fraction, tint = theme.role.primary, segment
   return (
     <Pressable onPress={onPress} disabled={!onPress} style={{ gap: theme.space.xs }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={{ color: theme.role.ink, fontWeight: '600' }}>{label}</Text>
-        <Text style={{ color: theme.role.inkMuted }}>{value}</Text>
+        <Text style={{ color: t.role.ink, fontWeight: '600' }}>{label}</Text>
+        <Text style={{ color: t.role.inkMuted }}>{value}</Text>
       </View>
       <View
         style={{
           flexDirection: 'row',
           height: TRACK_HEIGHT,
           borderRadius: TRACK_HEIGHT / 2,
-          backgroundColor: theme.role.line,
+          backgroundColor: t.role.line,
           overflow: 'hidden',
         }}
       >
@@ -57,7 +63,7 @@ export function Bar({ label, value, fraction, tint = theme.role.primary, segment
             {remainder > 0 && <View style={{ flex: remainder }} />}
           </>
         ) : (
-          <View style={{ width, height: '100%', borderRadius: TRACK_HEIGHT / 2, backgroundColor: tint }} />
+          <View style={{ width, height: '100%', borderRadius: TRACK_HEIGHT / 2, backgroundColor: resolvedTint }} />
         )}
       </View>
     </Pressable>

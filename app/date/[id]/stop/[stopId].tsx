@@ -19,6 +19,7 @@ import { PayerPicker } from '@/ui/PayerPicker';
 import { Rule } from '@/ui/Rule';
 import { SubkindChips } from '@/ui/SubkindChips';
 import { theme } from '@/ui/theme';
+import { useTheme } from '@/ui/ThemeProvider';
 import { commit } from '@/ui/feedback';
 
 /**
@@ -37,6 +38,7 @@ import { commit } from '@/ui/feedback';
 const AMOUNT_UNCHANGED = '';
 
 export default function StopEditor() {
+  const t = useTheme();
   const { id, stopId } = useLocalSearchParams<{ id: string; stopId: string }>();
   const deps = getAppDeps();
   const ctx = getLocalContext();
@@ -57,16 +59,16 @@ export default function StopEditor() {
       return (
         <>
           <Stack.Screen options={{ headerShown: false }} />
-          <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground }} />
+          <SafeAreaView style={{ flex: 1, backgroundColor: t.role.ground }} />
         </>
       );
     }
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground, justifyContent: 'center', padding: theme.space.lg }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: t.role.ground, justifyContent: 'center', padding: theme.space.lg }}>
           <Card>
-            <Text style={{ ...theme.type.body, color: theme.role.ink, textAlign: 'center' }}>That stop is gone.</Text>
+            <Text style={{ ...theme.type.body, color: t.role.ink, textAlign: 'center' }}>That stop is gone.</Text>
           </Card>
         </SafeAreaView>
       </>
@@ -132,12 +134,12 @@ export default function StopEditor() {
     ]);
   };
 
-  const tint = isStopKind(stop.kind) ? theme.kind[stop.kind] : theme.kind.other;
+  const tint = isStopKind(stop.kind) ? t.kind[stop.kind] : t.kind.other;
 
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.role.ground }}>
         <View
           style={{
             flexDirection: 'row',
@@ -207,8 +209,8 @@ export default function StopEditor() {
               value={current.label}
               onChangeText={(label) => patch({ label })}
               placeholder="What was it?"
-              placeholderTextColor={theme.role.inkMuted}
-              style={{ ...theme.type.body, color: theme.role.ink, padding: 0 }}
+              placeholderTextColor={t.role.inkMuted}
+              style={{ ...theme.type.body, color: t.role.ink, padding: 0 }}
             />
             <View style={{ marginVertical: theme.space.sm }}>
               <Rule />
@@ -217,8 +219,8 @@ export default function StopEditor() {
               value={current.placeName}
               onChangeText={(placeName) => patch({ placeName })}
               placeholder="Where?"
-              placeholderTextColor={theme.role.inkMuted}
-              style={{ ...theme.type.body, color: theme.role.ink, padding: 0 }}
+              placeholderTextColor={t.role.inkMuted}
+              style={{ ...theme.type.body, color: t.role.ink, padding: 0 }}
             />
           </Card>
 

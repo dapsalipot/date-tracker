@@ -15,12 +15,14 @@ import { KindIcon } from '@/ui/KindIcon';
 import { MicroLabel } from '@/ui/MicroLabel';
 import { Rule } from '@/ui/Rule';
 import { theme } from '@/ui/theme';
+import { useTheme } from '@/ui/ThemeProvider';
 import { tap } from '@/ui/feedback';
 
 const PHOTO_WIDTH = 96;
 const PHOTO_HEIGHT = 120;
 
 export default function DateDetail() {
+  const t = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: detailRows, updatedAt: detailUpdatedAt } = useLiveQuery(dateDetailQuery(db, id), [id]);
   const { data: stops } = useLiveQuery(stopsForDateQuery(db, id), [id]);
@@ -47,12 +49,12 @@ export default function DateDetail() {
   // updatedAt distinguishes them — it stays undefined until the first resolve.
   if (!detail) {
     if (detailUpdatedAt === undefined) {
-      return <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground }} />;
+      return <SafeAreaView style={{ flex: 1, backgroundColor: t.role.ground }} />;
     }
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground, justifyContent: 'center', padding: theme.space.lg }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.role.ground, justifyContent: 'center', padding: theme.space.lg }}>
         <Card>
-          <Text style={{ ...theme.type.body, color: theme.role.ink, textAlign: 'center' }}>
+          <Text style={{ ...theme.type.body, color: t.role.ink, textAlign: 'center' }}>
             That date no longer exists.
           </Text>
         </Card>
@@ -61,13 +63,13 @@ export default function DateDetail() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.role.ground }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.role.ground }}>
       <View style={{ padding: theme.space.md, gap: theme.space.md }}>
         <Card>
           <MicroLabel>
             {detail.occurredOn.toUpperCase()} · {detail.status.toUpperCase()}
           </MicroLabel>
-          <Text style={{ ...theme.type.title, color: theme.role.ink, marginTop: theme.space.xs }}>
+          <Text style={{ ...theme.type.title, color: t.role.ink, marginTop: theme.space.xs }}>
             {detail.title ?? 'Untitled date'}
           </Text>
         </Card>
@@ -90,7 +92,7 @@ export default function DateDetail() {
                       borderRadius: theme.radius.md,
                       overflow: 'hidden',
                       borderWidth: 1,
-                      borderColor: theme.role.line,
+                      borderColor: t.role.line,
                     }}
                   >
                     <Image
@@ -132,7 +134,7 @@ export default function DateDetail() {
                 >
                   <KindIcon kind={item.kind} size={16} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ ...theme.type.body, color: theme.role.ink }}>{item.label ?? item.kind}</Text>
+                    <Text style={{ ...theme.type.body, color: t.role.ink }}>{item.label ?? item.kind}</Text>
                     {/*
                       Either field alone is enough to show this line. Gating on
                       placeName hid the subkind entirely for the common case:
@@ -140,7 +142,7 @@ export default function DateDetail() {
                       tapping "cafe" and saving looked like nothing happened.
                     */}
                     {(item.placeName !== null || item.subkind !== null) && (
-                      <Text style={{ ...theme.type.meta, color: theme.role.inkMuted, marginTop: 2 }}>
+                      <Text style={{ ...theme.type.meta, color: t.role.inkMuted, marginTop: 2 }}>
                         {[item.placeName, item.subkind].filter((part) => part !== null).join(' · ')}
                       </Text>
                     )}
@@ -154,7 +156,7 @@ export default function DateDetail() {
                     disabled={index === 0}
                     style={{ opacity: index === 0 ? 0.25 : 1 }}
                   >
-                    <Ionicons name="chevron-up-outline" size={18} color={theme.role.inkMuted} />
+                    <Ionicons name="chevron-up-outline" size={18} color={t.role.inkMuted} />
                   </Pressable>
                   <Pressable
                     onPress={() => move(index, 1)}
@@ -162,9 +164,9 @@ export default function DateDetail() {
                     disabled={index === stops.length - 1}
                     style={{ opacity: index === stops.length - 1 ? 0.25 : 1 }}
                   >
-                    <Ionicons name="chevron-down-outline" size={18} color={theme.role.inkMuted} />
+                    <Ionicons name="chevron-down-outline" size={18} color={t.role.inkMuted} />
                   </Pressable>
-                  <Text style={{ ...theme.type.body, color: theme.role.ink, fontWeight: '700' }}>
+                  <Text style={{ ...theme.type.body, color: t.role.ink, fontWeight: '700' }}>
                     {formatMoney(money(item.amountMinor, item.currencyCode))}
                   </Text>
                 </View>

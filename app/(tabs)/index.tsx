@@ -22,6 +22,7 @@ import { MicroLabel } from '@/ui/MicroLabel';
 import { Rule } from '@/ui/Rule';
 import { Screen } from '@/ui/Screen';
 import { theme } from '@/ui/theme';
+import { useTheme } from '@/ui/ThemeProvider';
 import { commit, tap } from '@/ui/feedback';
 
 const MONTH_NAMES = [
@@ -75,6 +76,7 @@ interface MonthSection {
 const MAX_QUEUED_ROWS = 4;
 
 export default function Feed() {
+  const t = useTheme();
   const ctx = getLocalContext();
   const deps = getAppDeps();
 
@@ -224,17 +226,17 @@ export default function Feed() {
             paddingVertical: theme.space.sm,
           }}
         >
-          <Ionicons name="search-outline" size={18} color={theme.role.inkMuted} />
+          <Ionicons name="search-outline" size={18} color={t.role.inkMuted} />
           <TextInput
             value={search}
             onChangeText={setSearch}
             placeholder="Search dates, e.g. aug or 2026-08"
-            placeholderTextColor={theme.role.inkMuted}
-            style={{ ...theme.type.body, color: theme.role.ink, flex: 1, padding: 0 }}
+            placeholderTextColor={t.role.inkMuted}
+            style={{ ...theme.type.body, color: t.role.ink, flex: 1, padding: 0 }}
           />
           {search.length > 0 && (
             <Pressable onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={18} color={theme.role.inkMuted} />
+              <Ionicons name="close-circle" size={18} color={t.role.inkMuted} />
             </Pressable>
           )}
         </View>
@@ -261,20 +263,20 @@ export default function Feed() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <MicroLabel>NOT SAVED YET</MicroLabel>
               {drafts.length > 0 && (
-                <Text style={{ ...theme.type.meta, color: theme.role.primary }}>Finish</Text>
+                <Text style={{ ...theme.type.meta, color: t.role.primary }}>Finish</Text>
               )}
             </View>
 
             {drafts.length === 0 ? (
-              <Text style={{ ...theme.type.title, color: theme.role.inkMuted, marginTop: theme.space.xs }}>
+              <Text style={{ ...theme.type.title, color: t.role.inkMuted, marginTop: theme.space.xs }}>
                 Nothing waiting
               </Text>
             ) : (
               <>
-                <Text style={{ ...theme.type.display, color: theme.role.primary, marginTop: theme.space.xs }}>
+                <Text style={{ ...theme.type.display, color: t.role.primary, marginTop: theme.space.xs }}>
                   {formatMoney(money(queued.totalMinor, ctx.currencyCode))}
                 </Text>
-                <Text style={{ ...theme.type.meta, color: theme.role.inkMuted, marginTop: theme.space.xs }}>
+                <Text style={{ ...theme.type.meta, color: t.role.inkMuted, marginTop: theme.space.xs }}>
                   {queued.stops === 1 ? '1 stop' : `${queued.stops} stops`}
                   {' · '}
                   {drafts.length === 1 ? '1 date' : `${drafts.length} dates`}
@@ -291,7 +293,7 @@ export default function Feed() {
                   <QueuedStopRow key={stop.id} stop={stop} nowMs={deps.clock.nowMs()} />
                 ))}
                 {overflowCount > 0 && (
-                  <Text style={{ ...theme.type.micro, color: theme.role.inkMuted, marginTop: 2 }}>
+                  <Text style={{ ...theme.type.micro, color: t.role.inkMuted, marginTop: 2 }}>
                     +{overflowCount} more
                   </Text>
                 )}
@@ -315,13 +317,13 @@ export default function Feed() {
                   width: 32,
                   height: 32,
                   borderRadius: theme.radius.lg,
-                  backgroundColor: theme.role.primary,
+                  backgroundColor: t.role.primary,
                   alignItems: 'center',
                   justifyContent: 'center',
                   opacity: attachingPhoto ? 0.5 : 1,
                 }}
               >
-                <Ionicons name="camera-outline" size={16} color={theme.role.onPrimary} />
+                <Ionicons name="camera-outline" size={16} color={t.role.onPrimary} />
               </Pressable>
             </View>
           )}
@@ -357,15 +359,15 @@ export default function Feed() {
             paddingBottom: theme.space.xs,
             marginBottom: theme.space.sm,
             borderBottomWidth: 1,
-            borderBottomColor: theme.role.line,
+            borderBottomColor: t.role.line,
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.xs }}>
-            <Ionicons name="calendar-outline" size={14} color={theme.role.inkMuted} />
+            <Ionicons name="calendar-outline" size={14} color={t.role.inkMuted} />
             <MicroLabel>{dayLabel(effectiveSelectedDay).toUpperCase()}</MicroLabel>
           </View>
           <Pressable onPress={() => setSelectedDay(null)} hitSlop={8}>
-            <Text style={{ ...theme.type.meta, color: theme.role.primary }}>All month</Text>
+            <Text style={{ ...theme.type.meta, color: t.role.primary }}>All month</Text>
           </Pressable>
         </View>
       )}
@@ -383,7 +385,7 @@ export default function Feed() {
           )}
           ListEmptyComponent={
             <Card>
-              <Text style={{ ...theme.type.body, color: theme.role.inkMuted, textAlign: 'center' }}>
+              <Text style={{ ...theme.type.body, color: t.role.inkMuted, textAlign: 'center' }}>
                 No dates match "{search.trim()}"
               </Text>
             </Card>
@@ -401,13 +403,13 @@ export default function Feed() {
           ListEmptyComponent={
             drafts.length === 0 && published.length === 0 ? (
               <Card onPress={() => seedTwelveMonths(db, ctx.coupleId, ctx.userId, todayLocal, deps)}>
-                <Text style={{ ...theme.type.body, fontWeight: '600', color: theme.role.ink, textAlign: 'center' }}>
+                <Text style={{ ...theme.type.body, fontWeight: '600', color: t.role.ink, textAlign: 'center' }}>
                   Seed 12 months of demo dates
                 </Text>
               </Card>
             ) : (
               <Card>
-                <Text style={{ ...theme.type.body, color: theme.role.inkMuted, textAlign: 'center' }}>
+                <Text style={{ ...theme.type.body, color: t.role.inkMuted, textAlign: 'center' }}>
                   {effectiveSelectedDay !== null ? 'Nothing logged this day' : 'Nothing logged this month'}
                 </Text>
               </Card>
@@ -425,12 +427,12 @@ export default function Feed() {
           width: 60,
           height: 60,
           borderRadius: theme.radius.lg,
-          backgroundColor: theme.role.primary,
+          backgroundColor: t.role.primary,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Ionicons name="add" size={30} color={theme.role.onPrimary} />
+        <Ionicons name="add" size={30} color={t.role.onPrimary} />
       </Pressable>
     </Screen>
   );
@@ -438,16 +440,17 @@ export default function Feed() {
 
 /** One queued stop: its kind, what it was, what it cost, and when it landed. */
 function QueuedStopRow({ stop, nowMs }: { stop: QueuedStop; nowMs: number }) {
+  const t = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.xs }}>
       <KindIcon kind={stop.kind} size={14} />
-      <Text numberOfLines={1} style={{ ...theme.type.meta, color: theme.role.ink, flex: 1 }}>
+      <Text numberOfLines={1} style={{ ...theme.type.meta, color: t.role.ink, flex: 1 }}>
         {stop.label ?? kindLabel(stop.kind)}
       </Text>
-      <Text style={{ ...theme.type.meta, color: theme.role.inkMuted }}>
+      <Text style={{ ...theme.type.meta, color: t.role.inkMuted }}>
         {formatMoney(money(stop.amountMinor, stop.currencyCode))}
       </Text>
-      <Text style={{ ...theme.type.micro, color: theme.role.inkMuted, minWidth: 52, textAlign: 'right' }}>
+      <Text style={{ ...theme.type.micro, color: t.role.inkMuted, minWidth: 52, textAlign: 'right' }}>
         {relativeCaptureTime(nowMs, stop.occurredAt)}
       </Text>
     </View>
@@ -460,6 +463,7 @@ function QueuedStopRow({ stop, nowMs }: { stop: QueuedStop; nowMs: number }) {
  * hairline underneath — is what keeps it from reading as bare floating text.
  */
 function MonthHeader({ section, currencyCode }: { section: MonthSection; currencyCode: string }) {
+  const t = useTheme();
   return (
     <View
       style={{
@@ -468,14 +472,14 @@ function MonthHeader({ section, currencyCode }: { section: MonthSection; currenc
         justifyContent: 'space-between',
         paddingBottom: theme.space.xs,
         borderBottomWidth: 1,
-        borderBottomColor: theme.role.line,
+        borderBottomColor: t.role.line,
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.xs }}>
-        <Ionicons name="calendar-outline" size={14} color={theme.role.inkMuted} />
+        <Ionicons name="calendar-outline" size={14} color={t.role.inkMuted} />
         <MicroLabel>{section.title.toUpperCase()}</MicroLabel>
       </View>
-      <Text style={{ ...theme.type.body, color: theme.role.ink, fontWeight: '600' }}>
+      <Text style={{ ...theme.type.body, color: t.role.ink, fontWeight: '600' }}>
         {formatMoney(money(section.totalMinor, currencyCode))}
       </Text>
     </View>

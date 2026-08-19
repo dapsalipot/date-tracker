@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+import { Ionicons } from '@expo/vector-icons';
 import { db } from '@/db/client';
 import { getAppDeps, getLocalContext } from '@/session';
 import { publishedDatesQuery } from '@/domain/dates/drafts';
@@ -17,6 +18,7 @@ import { MicroLabel } from '@/ui/MicroLabel';
 import { Ring } from '@/ui/Ring';
 import { Screen } from '@/ui/Screen';
 import { theme } from '@/ui/theme';
+import { useTheme, useThemeToggle } from '@/ui/ThemeProvider';
 
 const TREND_MONTHS = 12;
 const TREND_CHART_HEIGHT = 80;
@@ -37,14 +39,16 @@ function formatPeriodMonth(periodMonth: string): string {
   return `${name} ${year}`;
 }
 
-const muted = { ...theme.type.meta, color: theme.role.inkMuted } as const;
-
-/** Bars are the one place a kind colour fills rather than outlines. */
-function kindTint(kind: string): string {
-  return isStopKind(kind) ? theme.kind[kind] : theme.kind.other;
-}
-
 export default function Dashboard() {
+  const t = useTheme();
+  const toggleTheme = useThemeToggle();
+  // Theme-dependent, so it can't live at module scope — a useTheme() call
+  // there would run before any ThemeProvider exists. `muted` and `kindTint`
+  // both moved inside the component for the same reason.
+  const muted = { ...theme.type.meta, color: t.role.inkMuted } as const;
+  /** Bars are the one place a kind colour fills rather than outlines. */
+  const kindTint = (kind: string): string => (isStopKind(kind) ? t.kind[kind] : t.kind.other);
+
   const ctx = getLocalContext();
   const deps = getAppDeps();
   const currentMonth = deps.clock.todayLocal().slice(0, 7);
@@ -92,7 +96,7 @@ export default function Dashboard() {
       <View style={{ marginHorizontal: -theme.screenMargin }}>
         <View
           style={{
-            backgroundColor: theme.role.surface,
+            backgroundColor: t.role.surface,
             borderBottomLeftRadius: theme.radius.lg,
             borderBottomRightRadius: theme.radius.lg,
             paddingHorizontal: theme.screenMargin,
@@ -103,20 +107,23 @@ export default function Dashboard() {
           }}
         >
           <Pressable onPress={() => step(-1)} hitSlop={12}>
-            <Text style={{ ...theme.type.title, color: theme.role.ink }}>‹</Text>
+            <Text style={{ ...theme.type.title, color: t.role.ink }}>‹</Text>
           </Pressable>
-          <Text style={{ ...theme.type.title, color: theme.role.ink }}>
+          <Text style={{ ...theme.type.title, color: t.role.ink }}>
             {formatPeriodMonth(periodMonth)}
           </Text>
           <Pressable onPress={() => step(1)} disabled={periodMonth === currentMonth} hitSlop={12}>
             <Text
               style={{
                 ...theme.type.title,
-                color: periodMonth === currentMonth ? theme.role.line : theme.role.ink,
+                color: periodMonth === currentMonth ? t.role.line : t.role.ink,
               }}
             >
               ›
             </Text>
+          </Pressable>
+          <Pressable onPress={toggleTheme} hitSlop={12}>
+            <Ionicons name={t.name === 'light' ? 'moon-outline' : 'sunny-outline'} size={20} color={t.role.ink} />
           </Pressable>
         </View>
       </View>
@@ -134,7 +141,7 @@ export default function Dashboard() {
           <MicroLabel>THIS MONTH</MicroLabel>
           {budgetMinor === null ? (
             <>
-              <Text style={{ ...theme.type.display, color: theme.role.primary, marginTop: theme.space.xs }}>
+              <Text style={{ ...theme.type.display, color: t.role.primary, marginTop: theme.space.xs }}>
                 {formatMoney(money(budget.spentMinor, ctx.currencyCode))}
               </Text>
               <Text style={muted}>spent · no budget set</Text>
@@ -142,7 +149,7 @@ export default function Dashboard() {
           ) : (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.space.sm, marginTop: theme.space.xs }}>
-                <Text style={{ ...theme.type.display, color: theme.role.primary }}>
+                <Text style={{ ...theme.type.display, color: t.role.primary }}>
                   {formatMoney(money(budget.spentMinor, ctx.currencyCode))}
                 </Text>
                 <Text style={muted}>of {formatMoney(money(budgetMinor, ctx.currencyCode))}</Text>
@@ -152,7 +159,7 @@ export default function Dashboard() {
                 style={{
                   height: 8,
                   borderRadius: theme.radius.sm,
-                  backgroundColor: theme.role.line,
+                  backgroundColor: t.role.line,
                   marginTop: theme.space.sm,
                   overflow: 'hidden',
                   flexDirection: 'row',
@@ -184,7 +191,7 @@ export default function Dashboard() {
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <MicroLabel>{drilledKind.toUpperCase()}</MicroLabel>
               <Pressable onPress={() => setDrilledKind(null)} hitSlop={8}>
-                <Text style={{ ...theme.type.meta, color: theme.role.primary }}>‹ All kinds</Text>
+                <Text style={{ ...theme.type.meta, color: t.role.primary }}>‹ All kinds</Text>
               </Pressable>
             </View>
           ) : (
@@ -207,7 +214,7 @@ export default function Dashboard() {
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.6}
-                  style={{ ...theme.type.title, color: theme.role.ink, textAlign: 'center' }}
+                  style={{ ...theme.type.title, color: t.role.ink, textAlign: 'center' }}
                 >
                   {formatMoney(money(kindTotal, ctx.currencyCode))}
                 </Text>
@@ -262,7 +269,7 @@ export default function Dashboard() {
                   flex: 1,
                   height: Math.max((m.totalMinor / topTrendTotal) * TREND_CHART_HEIGHT, TREND_MIN_SLIVER),
                   borderRadius: 2,
-                  backgroundColor: m.periodMonth === periodMonth ? theme.role.primary : theme.role.line,
+                  backgroundColor: m.periodMonth === periodMonth ? t.role.primary : t.role.line,
                 }}
               />
             ))}
@@ -282,7 +289,7 @@ export default function Dashboard() {
             <Text style={{ ...muted, marginTop: theme.space.xs }}>No dates this month</Text>
           ) : (
             <>
-              <Text style={{ ...theme.type.display, color: theme.role.ink, marginTop: theme.space.xs }}>
+              <Text style={{ ...theme.type.display, color: t.role.ink, marginTop: theme.space.xs }}>
                 {formatMoney(money(average.monthMinor, ctx.currencyCode))}
               </Text>
               {average.trailingMinor !== null && (
@@ -312,7 +319,7 @@ export default function Dashboard() {
                   key={place.placeName}
                   style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}
                 >
-                  <Text style={{ ...theme.type.body, color: theme.role.ink }}>{place.placeName}</Text>
+                  <Text style={{ ...theme.type.body, color: t.role.ink }}>{place.placeName}</Text>
                   <Text style={muted}>{formatMoney(money(place.totalMinor, ctx.currencyCode))}</Text>
                 </View>
               ))

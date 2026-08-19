@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { theme } from './theme';
+import { useTheme } from './ThemeProvider';
 import { tap } from './feedback';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -20,13 +21,14 @@ export function Card({
   onPress?: () => void;
   padded?: boolean;
 }) {
+  const t = useTheme();
   const pressed = useSharedValue(0);
   const animated = useAnimatedStyle(() => ({
     transform: [{ scale: withTiming(pressed.value === 1 ? 0.985 : 1, { duration: theme.motion.fast }) }],
   }));
 
   const surface = {
-    backgroundColor: theme.role.surface,
+    backgroundColor: t.role.surface,
     borderRadius: theme.radius.lg,
     overflow: 'hidden' as const,
     padding: padded ? theme.space.md : 0,

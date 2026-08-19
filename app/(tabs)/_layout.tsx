@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/ui/theme';
+import { useTheme } from '@/ui/ThemeProvider';
 
 /**
  * `headerShown: false` is safe here in a way it was not at the root Stack: a
@@ -13,13 +14,14 @@ import { theme } from '@/ui/theme';
  * carries the state at a glance rather than colour alone.
  */
 export default function TabsLayout() {
+  const t = useTheme();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.role.primary,
-        tabBarInactiveTintColor: theme.role.inkMuted,
-        tabBarStyle: { backgroundColor: theme.role.surface, borderTopColor: theme.role.line },
+        tabBarActiveTintColor: t.role.primary,
+        tabBarInactiveTintColor: t.role.inkMuted,
+        tabBarStyle: { backgroundColor: t.role.surface, borderTopColor: t.role.line },
         tabBarLabelStyle: { ...theme.type.micro },
       }}
     >

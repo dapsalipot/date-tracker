@@ -1,7 +1,8 @@
 import { View } from 'react-native';
-import { theme } from './theme';
+import { useTheme } from './ThemeProvider';
 
 /** The hairline the whole direction is built on. */
 export function Rule() {
-  return <View style={{ height: 1, backgroundColor: theme.role.line }} />;
+  const t = useTheme();
+  return <View style={{ height: 1, backgroundColor: t.role.line }} />;
 }
