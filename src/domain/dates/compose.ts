@@ -3,12 +3,16 @@ import { dates } from '@/db/schema';
 import type { AppDatabase } from '@/db/types';
 import type { Deps } from '@/domain/deps';
 
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
 export interface DateDetails {
   title?: string | null;
   caption?: string | null;
   rating?: number | null;
   coverPhotoId?: string | null;
   locationLabel?: string | null;
+  /** ISO `YYYY-MM-DD`. Rejected if malformed or in the future. */
+  occurredOn?: string;
 }
 
 export interface DateDetail {
@@ -53,6 +57,19 @@ export function updateDateDetails(
   if (details.rating !== undefined) patch.rating = details.rating;
   if (details.coverPhotoId !== undefined) patch.coverPhotoId = details.coverPhotoId;
   if (details.locationLabel !== undefined) patch.locationLabel = details.locationLabel;
+  if (details.occurredOn !== undefined) {
+    // Compared as a string everywhere — month grouping, the calendar grid and
+    // every analytics read run substr over it — so a malformed value corrupts
+    // all of them at once and silently.
+    if (!ISO_DAY.test(details.occurredOn)) {
+      throw new Error(`occurredOn must be YYYY-MM-DD, got: ${details.occurredOn}`);
+    }
+    // String comparison is correct for ISO days and needs no timezone.
+    if (details.occurredOn > deps.clock.todayLocal()) {
+      throw new Error('a date cannot have happened in the future');
+    }
+    patch.occurredOn = details.occurredOn;
+  }
 
   db.update(dates).set(patch).where(eq(dates.id, dateId)).run();
 }

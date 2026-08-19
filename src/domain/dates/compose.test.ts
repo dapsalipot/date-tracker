@@ -43,6 +43,57 @@ describe('updateDateDetails', () => {
     expect(updatedAtOf()).toBe(1_785_999_999_999);
     expect(updatedAtOf()).not.toBe(before);
   });
+
+  it('moves a date to the day it actually happened', () => {
+    const { db, dateId } = setup();
+
+    updateDateDetails(db, DEPS, dateId, { occurredOn: '2026-07-04' });
+
+    expect(loadDateDetail(db, dateId)?.occurredOn).toBe('2026-07-04');
+  });
+
+  it('refuses a date in the future', () => {
+    // A journal, not a planner. A future date has no stops and would sort above
+    // every real memory on the feed.
+    const { db, dateId } = setup();
+
+    expect(() => updateDateDetails(db, DEPS, dateId, { occurredOn: '2099-01-01' }))
+      .toThrow(/future/i);
+    expect(loadDateDetail(db, dateId)?.occurredOn).not.toBe('2099-01-01');
+  });
+
+  it('accepts today itself', () => {
+    // The boundary matters: "not in the future" must not reject today, which is
+    // the day almost every date is captured on.
+    const { db, dateId } = setup();
+
+    expect(() => updateDateDetails(db, DEPS, dateId, { occurredOn: DEPS.clock.todayLocal() }))
+      .not.toThrow();
+  });
+
+  it('refuses a malformed date', () => {
+    // occurredOn is compared as a string throughout the app — month grouping,
+    // the calendar, and every analytics read use substr on it. A value that is
+    // not YYYY-MM-DD corrupts all of them silently.
+    //
+    // MM-DD-YYYY is used here rather than something like '4 July': it sorts
+    // lexically *before* DEPS' today ('07-04-2026' < '2026-08-03' since '0' <
+    // '2'), so this only throws if the format guard runs — a value that sorts
+    // after today would also be caught by the future-date guard, and the test
+    // would pass for the wrong reason.
+    const { db, dateId } = setup();
+
+    expect(() => updateDateDetails(db, DEPS, dateId, { occurredOn: '07-04-2026' })).toThrow();
+  });
+
+  it('leaves the day alone when the patch omits it', () => {
+    const { db, dateId } = setup();
+    const before = loadDateDetail(db, dateId)?.occurredOn;
+
+    updateDateDetails(db, DEPS, dateId, { title: 'Dinner' });
+
+    expect(loadDateDetail(db, dateId)?.occurredOn).toBe(before);
+  });
 });
 
 describe('loadDateDetail', () => {
