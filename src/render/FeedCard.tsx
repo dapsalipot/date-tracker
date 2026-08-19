@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Image, Text, View } from 'react-native';
 import type { FeedDate } from '@/domain/dates/repository';
 import { formatMoney, money } from '@/domain/money/money';
@@ -67,18 +68,20 @@ export function FeedCard({ date, onPress }: Props) {
   return (
     <Card padded={false} onPress={onPress} photoUri={date.coverUri} photoHeight={COVER_HEIGHT}>
       <View style={{ padding: theme.space.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <Text
-            style={{ ...theme.type.title, color: t.role.ink, flex: 1, marginRight: theme.space.sm }}
-            numberOfLines={1}
-          >
-            {date.title ?? 'Untitled date'}
-          </Text>
-          <Text style={{ ...theme.type.title, color: t.role.ink }}>{total}</Text>
-        </View>
+        {/*
+          V3 fix: at two-up width there isn't room for the title and the
+          amount on one row at title size — the amount (fixed width) was
+          winning the row and collapsing the title to a sliver. The title is
+          how you tell one card from another, so it gets the full-width row;
+          the amount moves down onto the meta line, same placement `FeedHero`
+          already uses for its own title/meta split.
+        */}
+        <Text style={{ ...theme.type.title, color: t.role.ink }} numberOfLines={1}>
+          {date.title ?? 'Untitled date'}
+        </Text>
 
         <Text style={{ ...theme.type.meta, color: t.role.inkMuted, marginTop: theme.space.xs }}>
-          {formatDateLabel(date.occurredOn)} · {stopLabel}
+          {formatDateLabel(date.occurredOn)} · {stopLabel} · {total}
         </Text>
 
         {/*
@@ -129,7 +132,13 @@ export function FeedHero({ date, onPress }: Props) {
   const { animatedStyle, onPressIn, onPressOut } = usePressScale();
   const total = formatMoney(money(date.totalMinor, date.currencyCode));
   const stopLabel = date.stopCount === 1 ? '1 stop' : `${date.stopCount} stops`;
-  const hasCover = date.coverUri !== null;
+  // Same failed-load tracking `CalendarGrid` uses for its day cells: a stale
+  // absolute path fails to load, and without this the hero would keep trying
+  // to render a photo layout (scrim + white text) over nothing. Stored as
+  // the failed uri itself, not a boolean, so a new hero date with a working
+  // cover isn't stuck coverless by a previous date's failure.
+  const [failedCoverUri, setFailedCoverUri] = useState<string | null>(null);
+  const hasCover = date.coverUri !== null && date.coverUri !== failedCoverUri;
 
   const caption = (
     <>
@@ -177,7 +186,12 @@ export function FeedHero({ date, onPress }: Props) {
       >
         {hasCover ? (
           <View style={{ width: '100%', aspectRatio: HERO_ASPECT }}>
-            <Image source={{ uri: date.coverUri as string }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            <Image
+              source={{ uri: date.coverUri as string }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+              onError={() => setFailedCoverUri(date.coverUri)}
+            />
             <View
               style={{
                 position: 'absolute', left: 0, right: 0, bottom: 0,

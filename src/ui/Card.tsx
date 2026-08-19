@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { Image, Pressable, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { theme } from './theme';
@@ -49,6 +50,12 @@ export function Card({
 }) {
   const t = useTheme();
   const { animatedStyle, onPressIn, onPressOut } = usePressScale();
+  // V4: same failed-load tracking as CalendarGrid/FeedHero — a photoUri
+  // whose Image errors (stale path) falls back to no photo at all rather
+  // than an empty hole where the mat photo should be. Keyed by the uri
+  // itself so a fresh photoUri on the same instance isn't stuck hidden.
+  const [failedPhotoUri, setFailedPhotoUri] = useState<string | null>(null);
+  const showPhoto = photoUri !== null && photoUri !== undefined && photoUri !== failedPhotoUri;
 
   // overflow: 'hidden' sets masksToBounds on iOS, which clips a layer's own
   // shadow along with its children. Split the lift onto an outer wrapper and
@@ -72,15 +79,16 @@ export function Card({
 
   const content = (
     <>
-      {photoUri !== null && photoUri !== undefined && (
+      {showPhoto && (
         <Image
-          source={{ uri: photoUri }}
+          source={{ uri: photoUri as string }}
           style={{
             height: photoHeight ?? 120,
             margin: MAT_INSET,
             borderRadius: theme.radius.md,
           }}
           resizeMode="cover"
+          onError={() => setFailedPhotoUri(photoUri ?? null)}
         />
       )}
       {children}
