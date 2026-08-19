@@ -6,7 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { db } from '@/db/client';
 import { dailyCovers } from '@/domain/analytics/covers';
-import { dailySpend } from '@/domain/analytics/daily';
+import { dailySpend, type DaySpend } from '@/domain/analytics/daily';
 import { shiftMonth } from '@/domain/analytics/period';
 import { toFeedDate, type FeedDate } from '@/domain/dates/repository';
 import { draftDatesQuery, listQueuedStops, publishedDatesQuery, type QueuedStop } from '@/domain/dates/drafts';
@@ -76,6 +76,208 @@ interface MonthSection {
 }
 
 const MAX_QUEUED_ROWS = 4;
+
+interface FeedListHeaderProps {
+  search: string;
+  onChangeSearch: (value: string) => void;
+  isSearching: boolean;
+  drafts: FeedDate[];
+  queuedTotalMinor: number;
+  queuedStopCount: number;
+  currencyCode: string;
+  visibleQueuedStops: QueuedStop[];
+  overflowCount: number;
+  nowMs: number;
+  attachingPhoto: boolean;
+  onAttachPhoto: () => void;
+  onOpenOldestDraft: () => void;
+  periodMonth: string;
+  todayLocal: string;
+  heatDays: DaySpend[];
+  covers: ReadonlyMap<string, string>;
+  effectiveSelectedDay: string | null;
+  onSelectDay: (day: string) => void;
+  onStepMonth: (delta: number) => void;
+  onClearSelectedDay: () => void;
+  canStepForward: boolean;
+}
+
+/**
+ * The Dates screen's fixed chrome — search, the queued-spending card, and
+ * (outside search) the calendar and its day-selection header — rendered as
+ * `ListHeaderComponent` so it scrolls with the feed instead of eating fixed
+ * height above it. A single component covers both the FlatList (month view)
+ * and SectionList (search view): search hides the calendar/day-header via
+ * `isSearching`, exactly as the old inline JSX did.
+ *
+ * Defined at module scope (not inside `Feed`) so its function identity never
+ * changes across renders — `ListHeaderComponent` remounts its subtree
+ * whenever the component type it's given changes identity, which would
+ * otherwise drop focus from the search `TextInput` on every keystroke.
+ */
+function FeedListHeader({
+  search, onChangeSearch, isSearching, drafts, queuedTotalMinor, queuedStopCount, currencyCode,
+  visibleQueuedStops, overflowCount, nowMs, attachingPhoto, onAttachPhoto, onOpenOldestDraft,
+  periodMonth, todayLocal, heatDays, covers, effectiveSelectedDay, onSelectDay, onStepMonth,
+  onClearSelectedDay, canStepForward,
+}: FeedListHeaderProps) {
+  const t = useTheme();
+  return (
+    <>
+      <Card padded={false}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: theme.space.sm,
+            paddingHorizontal: theme.space.md,
+            paddingVertical: theme.space.sm,
+          }}
+        >
+          <Ionicons name="search-outline" size={18} color={t.role.inkMuted} />
+          <TextInput
+            value={search}
+            onChangeText={onChangeSearch}
+            placeholder="Search dates, e.g. aug or 2026-08"
+            placeholderTextColor={t.role.inkMuted}
+            style={{ ...theme.type.body, color: t.role.ink, flex: 1, padding: 0 }}
+          />
+          {search.length > 0 && (
+            <Pressable onPress={() => onChangeSearch('')}>
+              <Ionicons name="close-circle" size={18} color={t.role.inkMuted} />
+            </Pressable>
+          )}
+        </View>
+      </Card>
+
+      {/*
+        What has been captured but not yet finished into a date. Tapping the
+        total opens the oldest draft — the longest-neglected one is the one
+        worth nudging hardest. The stop list underneath is the point: a total
+        alone does not say what was actually logged, or when.
+      */}
+      <View style={{ marginTop: theme.space.sm }}>
+        <Card padded={false}>
+          <Pressable
+            onPress={onOpenOldestDraft}
+            disabled={drafts.length === 0}
+            style={{ paddingHorizontal: theme.space.md, paddingTop: theme.space.sm, paddingBottom: theme.space.xs }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <MicroLabel>NOT SAVED YET</MicroLabel>
+              {drafts.length > 0 && (
+                <Text style={{ ...theme.type.meta, color: t.role.primary }}>Finish</Text>
+              )}
+            </View>
+
+            {drafts.length === 0 ? (
+              <Text style={{ ...theme.type.title, color: t.role.inkMuted, marginTop: theme.space.xs }}>
+                Nothing waiting
+              </Text>
+            ) : (
+              <>
+                <Text style={{ ...theme.type.display, color: t.role.primary, marginTop: theme.space.xs }}>
+                  {formatMoney(money(queuedTotalMinor, currencyCode))}
+                </Text>
+                <Text style={{ ...theme.type.meta, color: t.role.inkMuted, marginTop: theme.space.xs }}>
+                  {queuedStopCount === 1 ? '1 stop' : `${queuedStopCount} stops`}
+                  {' · '}
+                  {drafts.length === 1 ? '1 date' : `${drafts.length} dates`}
+                </Text>
+              </>
+            )}
+          </Pressable>
+
+          {visibleQueuedStops.length > 0 && (
+            <View style={{ paddingHorizontal: theme.space.md, paddingBottom: theme.space.sm }}>
+              <Rule />
+              <View style={{ marginTop: theme.space.sm, gap: theme.space.xs }}>
+                {visibleQueuedStops.map((stop) => (
+                  <QueuedStopRow key={stop.id} stop={stop} nowMs={nowMs} />
+                ))}
+                {overflowCount > 0 && (
+                  <Text style={{ ...theme.type.micro, color: t.role.inkMuted, marginTop: 2 }}>
+                    +{overflowCount} more
+                  </Text>
+                )}
+              </View>
+            </View>
+          )}
+
+          {drafts.length > 0 && (
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'flex-end',
+                paddingHorizontal: theme.space.md,
+                paddingBottom: theme.space.md,
+              }}
+            >
+              <Pressable
+                onPress={() => { tap(); onAttachPhoto(); }}
+                disabled={attachingPhoto}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: theme.radius.lg,
+                  backgroundColor: t.role.primary,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: attachingPhoto ? 0.5 : 1,
+                }}
+              >
+                <Ionicons name="camera-outline" size={16} color={t.role.onPrimary} />
+              </Pressable>
+            </View>
+          )}
+        </Card>
+      </View>
+
+      {/*
+        Calendar is the default: it picks the month, the list below just
+        shows what's in it. A non-empty search spans months incoherently
+        against a single-month grid, so search hides the calendar and falls
+        back to the old month-grouped list across every month instead.
+      */}
+      {!isSearching && (
+        <View style={{ marginTop: theme.space.md }}>
+          <CalendarGrid
+            periodMonth={periodMonth}
+            todayLocal={todayLocal}
+            days={heatDays}
+            covers={covers}
+            selectedDay={effectiveSelectedDay}
+            onSelectDay={onSelectDay}
+            onStepMonth={onStepMonth}
+            canStepForward={canStepForward}
+          />
+        </View>
+      )}
+
+      {!isSearching && effectiveSelectedDay !== null && (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingBottom: theme.space.xs,
+            marginTop: theme.space.md,
+            borderBottomWidth: 1,
+            borderBottomColor: t.role.line,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.xs }}>
+            <Ionicons name="calendar-outline" size={14} color={t.role.inkMuted} />
+            <MicroLabel>{dayLabel(effectiveSelectedDay).toUpperCase()}</MicroLabel>
+          </View>
+          <Pressable onPress={onClearSelectedDay} hitSlop={8}>
+            <Text style={{ ...theme.type.meta, color: t.role.primary }}>All month</Text>
+          </Pressable>
+        </View>
+      )}
+    </>
+  );
+}
 
 export default function Feed() {
   const t = useTheme();
@@ -233,171 +435,51 @@ export default function Feed() {
     }
   };
 
+  // Stable-typed element (not a fresh inline component) so `ListHeaderComponent`
+  // never remounts it across renders — see `FeedListHeader`'s own doc comment.
+  // Shared by both lists below: search hides the calendar/day-header, exactly
+  // as the header's own `isSearching` branch already handles.
+  const listHeader = (
+    <FeedListHeader
+      search={search}
+      onChangeSearch={setSearch}
+      isSearching={isSearching}
+      drafts={drafts}
+      queuedTotalMinor={queued.totalMinor}
+      queuedStopCount={queued.stops}
+      currencyCode={ctx.currencyCode}
+      visibleQueuedStops={visibleQueuedStops}
+      overflowCount={overflowCount}
+      nowMs={deps.clock.nowMs()}
+      attachingPhoto={attachingPhoto}
+      onAttachPhoto={() => void attachPhotoToLatestQueued()}
+      onOpenOldestDraft={() => {
+        const oldest = drafts[0];
+        if (oldest === undefined) return;
+        tap();
+        router.push(`/date/${oldest.id}/compose`);
+      }}
+      periodMonth={periodMonth}
+      todayLocal={todayLocal}
+      heatDays={heatDays}
+      covers={covers}
+      effectiveSelectedDay={effectiveSelectedDay}
+      onSelectDay={(day) => setSelectedDay((cur) => (cur === day ? null : day))}
+      onStepMonth={(delta) => setPeriodMonth((p) => shiftMonth(p, delta))}
+      onClearSelectedDay={() => setSelectedDay(null)}
+      canStepForward={periodMonth !== currentMonth}
+    />
+  );
+
   return (
     <Screen>
-      <Card padded={false}>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: theme.space.sm,
-            paddingHorizontal: theme.space.md,
-            paddingVertical: theme.space.sm,
-          }}
-        >
-          <Ionicons name="search-outline" size={18} color={t.role.inkMuted} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search dates, e.g. aug or 2026-08"
-            placeholderTextColor={t.role.inkMuted}
-            style={{ ...theme.type.body, color: t.role.ink, flex: 1, padding: 0 }}
-          />
-          {search.length > 0 && (
-            <Pressable onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={18} color={t.role.inkMuted} />
-            </Pressable>
-          )}
-        </View>
-      </Card>
-
-      {/*
-        What has been captured but not yet finished into a date. Tapping the
-        total opens the oldest draft — the longest-neglected one is the one
-        worth nudging hardest. The stop list underneath is the point: a total
-        alone does not say what was actually logged, or when.
-      */}
-      <View style={{ marginTop: theme.space.sm, marginBottom: theme.space.md }}>
-        <Card padded={false}>
-          <Pressable
-            onPress={() => {
-              const oldest = drafts[0];
-              if (oldest === undefined) return;
-              tap();
-              router.push(`/date/${oldest.id}/compose`);
-            }}
-            disabled={drafts.length === 0}
-            style={{ paddingHorizontal: theme.space.md, paddingTop: theme.space.sm, paddingBottom: theme.space.xs }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <MicroLabel>NOT SAVED YET</MicroLabel>
-              {drafts.length > 0 && (
-                <Text style={{ ...theme.type.meta, color: t.role.primary }}>Finish</Text>
-              )}
-            </View>
-
-            {drafts.length === 0 ? (
-              <Text style={{ ...theme.type.title, color: t.role.inkMuted, marginTop: theme.space.xs }}>
-                Nothing waiting
-              </Text>
-            ) : (
-              <>
-                <Text style={{ ...theme.type.display, color: t.role.primary, marginTop: theme.space.xs }}>
-                  {formatMoney(money(queued.totalMinor, ctx.currencyCode))}
-                </Text>
-                <Text style={{ ...theme.type.meta, color: t.role.inkMuted, marginTop: theme.space.xs }}>
-                  {queued.stops === 1 ? '1 stop' : `${queued.stops} stops`}
-                  {' · '}
-                  {drafts.length === 1 ? '1 date' : `${drafts.length} dates`}
-                </Text>
-              </>
-            )}
-          </Pressable>
-
-          {visibleQueuedStops.length > 0 && (
-            <View style={{ paddingHorizontal: theme.space.md, paddingBottom: theme.space.sm }}>
-              <Rule />
-              <View style={{ marginTop: theme.space.sm, gap: theme.space.xs }}>
-                {visibleQueuedStops.map((stop) => (
-                  <QueuedStopRow key={stop.id} stop={stop} nowMs={deps.clock.nowMs()} />
-                ))}
-                {overflowCount > 0 && (
-                  <Text style={{ ...theme.type.micro, color: t.role.inkMuted, marginTop: 2 }}>
-                    +{overflowCount} more
-                  </Text>
-                )}
-              </View>
-            </View>
-          )}
-
-          {drafts.length > 0 && (
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'flex-end',
-                paddingHorizontal: theme.space.md,
-                paddingBottom: theme.space.md,
-              }}
-            >
-              <Pressable
-                onPress={() => { tap(); void attachPhotoToLatestQueued(); }}
-                disabled={attachingPhoto}
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: theme.radius.lg,
-                  backgroundColor: t.role.primary,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: attachingPhoto ? 0.5 : 1,
-                }}
-              >
-                <Ionicons name="camera-outline" size={16} color={t.role.onPrimary} />
-              </Pressable>
-            </View>
-          )}
-        </Card>
-      </View>
-
-      {/*
-        Calendar is the default: it picks the month, the list below just
-        shows what's in it. A non-empty search spans months incoherently
-        against a single-month grid, so search hides the calendar and falls
-        back to the old month-grouped list across every month instead.
-      */}
-      {!isSearching && (
-        <View style={{ marginBottom: theme.space.md }}>
-          <CalendarGrid
-            periodMonth={periodMonth}
-            todayLocal={todayLocal}
-            days={heatDays}
-            covers={covers}
-            selectedDay={effectiveSelectedDay}
-            onSelectDay={(day) => setSelectedDay((cur) => (cur === day ? null : day))}
-            onStepMonth={(delta) => setPeriodMonth((p) => shiftMonth(p, delta))}
-            canStepForward={periodMonth !== currentMonth}
-          />
-        </View>
-      )}
-
-      {!isSearching && effectiveSelectedDay !== null && (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingBottom: theme.space.xs,
-            marginBottom: theme.space.sm,
-            borderBottomWidth: 1,
-            borderBottomColor: t.role.line,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space.xs }}>
-            <Ionicons name="calendar-outline" size={14} color={t.role.inkMuted} />
-            <MicroLabel>{dayLabel(effectiveSelectedDay).toUpperCase()}</MicroLabel>
-          </View>
-          <Pressable onPress={() => setSelectedDay(null)} hitSlop={8}>
-            <Text style={{ ...theme.type.meta, color: t.role.primary }}>All month</Text>
-          </Pressable>
-        </View>
-      )}
-
       {isSearching ? (
         <SectionList
           style={{ flex: 1 }}
           sections={searchRowSections}
           keyExtractor={feedRowKey}
           stickySectionHeadersEnabled={false}
+          ListHeaderComponent={listHeader}
           contentContainerStyle={{ paddingBottom: theme.space.xxl, gap: theme.space.md }}
           renderSectionHeader={({ section }) => <MonthHeader section={section} currencyCode={ctx.currencyCode} />}
           renderItem={({ item }) => (
@@ -416,6 +498,7 @@ export default function Feed() {
           style={{ flex: 1 }}
           data={monthRows}
           keyExtractor={feedRowKey}
+          ListHeaderComponent={listHeader}
           contentContainerStyle={{ paddingBottom: theme.space.xxl, gap: theme.space.md }}
           renderItem={({ item }) => (
             <FeedRhythmRow row={item} onPress={(date) => router.push(`/date/${date.id}`)} />

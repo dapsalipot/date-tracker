@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import type { DaySpend } from '@/domain/analytics/daily';
 import { Card } from '@/ui/Card';
@@ -111,6 +111,10 @@ export function CalendarGrid({
   const weeks = useMemo(() => buildWeeks(periodMonth), [periodMonth]);
   const byDay = useMemo(() => new Map(days.map((d) => [d.occurredOn, d])), [days]);
   const maxSpend = useMemo(() => Math.max(0, ...days.map((d) => d.totalMinor)), [days]);
+  // Cover URIs whose `Image` failed to load (missing file, stale path). A day
+  // in here falls back to the coverless tint+dot treatment instead of a bare
+  // scrim floating over nothing — see `hasCover` below.
+  const [failedCovers, setFailedCovers] = useState<ReadonlySet<string>>(new Set());
 
   return (
     <Card>
@@ -147,7 +151,7 @@ export function CalendarGrid({
               const dayNum = Number.parseInt(iso.slice(8, 10), 10);
               const isToday = iso === todayLocal;
               const isSelected = iso === selectedDay;
-              const hasCover = coverUri !== undefined;
+              const hasCover = coverUri !== undefined && !failedCovers.has(coverUri);
               const tint = spend !== undefined && maxSpend > 0
                 ? withAlpha(t.role.primary, MIN_ALPHA + (spend.totalMinor / maxSpend) * (MAX_ALPHA - MIN_ALPHA))
                 : 'transparent';
@@ -184,6 +188,9 @@ export function CalendarGrid({
                           source={{ uri: coverUri }}
                           style={{ width: '100%', height: '100%' }}
                           resizeMode="cover"
+                          onError={() => {
+                            setFailedCovers((cur) => (cur.has(coverUri) ? cur : new Set(cur).add(coverUri)));
+                          }}
                         />
                         <View style={{
                           position: 'absolute', minWidth: 18, height: 18, borderRadius: 9,
