@@ -136,3 +136,13 @@ export const outbox = sqliteTable('outbox', {
   op: text('op').notNull(),
   queuedAt: integer('queued_at').notNull(),
 });
+
+/**
+ * Local UI preferences. Deliberately not couple-scoped and not synced: which
+ * theme this phone shows is a property of the device, not of the relationship.
+ */
+export const appSettings = sqliteTable('app_settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
