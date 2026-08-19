@@ -164,8 +164,16 @@ pictures, which is how the navigation itself turns personal.
   dot.
 - Today keeps its accent ring, drawn *outside* the photo so it survives on any image.
 
-Needs one new query: cover photo per day for a month, scoped by couple and currency like every
-other analytics read, through the shared `monthScope` predicate.
+Needs one new query: cover photo per day for a month, scoped by couple and respecting both the
+date's and the photo's tombstones.
+
+**Amended 2026-08-20, after implementation.** This section originally required the query to go
+through the shared `monthScope` predicate and to scope by currency, like every other analytics
+read. That is not implementable: `monthScope` predicates on `stops.currencyCode` and needs the
+`stops` join, which multiplies rows per date and would drop a photographed date whose stops are
+all in another currency. A cover photo is a property of the date, not of its spending, so the
+query filters on `dates` directly. The reasoning is recorded in `dailyCovers`'s doc comment so
+nobody "restores" the shared predicate later.
 
 ## 7. Feed rhythm
 
@@ -220,8 +228,11 @@ Mostly pure functions, tested in plain Node as the rest of the codebase is.
 2. **Theme completeness.** Light and dark are asserted to have identical key sets, recursively.
 3. **Kind coverage and contrast.** Every `StopKind` has a colour in both themes, and every one
    clears 4.5:1 against its theme's `surface`, since kind colours render as chip text.
-4. **The per-day cover query** gets the same treatment as the other analytics reads: couple
-   scoping, currency scoping and tombstones each proven by a mutation that must fail a test.
+4. **The per-day cover query** gets couple scoping and both tombstone paths (the date's and the
+   photo's) each proven by a mutation that must fail a test. **No currency mutation** — per the
+   amendment in §6, this query deliberately does not scope by currency, so such a test cannot
+   exist. A fourth mutation (`innerJoin` → `leftJoin`) was found to be an equivalent mutant: the
+   downstream null filter already subsumes it, so it is documented rather than killed.
 5. **Hero selection** — newest published date, excluding drafts and tombstoned dates — is a pure
    function over a list, tested directly.
 
