@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { theme } from './theme';
 import { STOP_KINDS } from '@/domain/stops/taxonomy';
+import { contrastRatio } from './contrast';
+import { darkTheme, lightTheme, themes, type Theme } from './themes';
 
 describe('type scale', () => {
   it('descends at every step', () => {
@@ -56,34 +58,81 @@ describe('type scale', () => {
   });
 });
 
-describe('colour system', () => {
-  it('gives every stop kind its own colour', () => {
-    for (const kind of STOP_KINDS) {
-      expect(theme.kind[kind]).toMatch(/^#[0-9A-F]{6}$/i);
+const AA_TEXT = 4.5;
+const AA_LARGE = 3;
+
+function keyPaths(value: unknown, prefix = ''): string[] {
+  if (value === null || typeof value !== 'object') return [prefix];
+  return Object.entries(value as Record<string, unknown>)
+    .flatMap(([k, v]) => keyPaths(v, prefix === '' ? k : `${prefix}.${k}`))
+    .sort();
+}
+
+describe('themes', () => {
+  it.each([['light', lightTheme], ['dark', darkTheme]] as const)(
+    '%s keeps body text legible on both ground and surface',
+    (_name, t: Theme) => {
+      for (const ink of [t.role.ink, t.role.inkMuted]) {
+        expect(contrastRatio(ink, t.role.ground)).toBeGreaterThanOrEqual(AA_TEXT);
+        expect(contrastRatio(ink, t.role.surface)).toBeGreaterThanOrEqual(AA_TEXT);
+      }
+    },
+  );
+
+  it.each([['light', lightTheme], ['dark', darkTheme]] as const)(
+    '%s can put a label on its primary button',
+    (_name, t: Theme) => {
+      expect(contrastRatio(t.role.onPrimary, t.role.primary)).toBeGreaterThanOrEqual(AA_TEXT);
+    },
+  );
+
+  it.each([['light', lightTheme], ['dark', darkTheme]] as const)(
+    '%s shows its accent against the ground',
+    (_name, t: Theme) => {
+      expect(contrastRatio(t.role.primary, t.role.ground)).toBeGreaterThanOrEqual(AA_LARGE);
+    },
+  );
+
+  it.each([['light', lightTheme], ['dark', darkTheme]] as const)(
+    '%s keeps every kind readable as chip text',
+    (_name, t: Theme) => {
+      // 4.5 and not 3, because a kind colour renders as an 11pt chip LABEL,
+      // not merely as a bar fill. The first gold tried here, #B07A12, measured
+      // 3.41:1 and was unreadable.
+      for (const k of STOP_KINDS) {
+        expect(contrastRatio(t.kind[k], t.role.surface)).toBeGreaterThanOrEqual(AA_TEXT);
+      }
+    },
+  );
+
+  it('gives both themes identical shapes', () => {
+    // A key present in one theme and missing from the other is a crash on
+    // whichever screen reads it, on whichever theme the user happens to pick.
+    //
+    // `lift` is excluded here and checked separately below: it is `Lift | null`
+    // by design, an object in light and a bare `null` in dark, so its own
+    // internal shape necessarily diverges between themes. Diffing it here would
+    // fail on the intended difference rather than on an accidental one.
+    const { lift: _darkLift, ...darkRest } = darkTheme;
+    const { lift: _lightLift, ...lightRest } = lightTheme;
+    expect(keyPaths(darkRest)).toEqual(keyPaths(lightRest));
+  });
+
+  it('covers every stop kind in both themes', () => {
+    for (const t of [lightTheme, darkTheme]) {
+      for (const k of STOP_KINDS) expect(t.kind[k]).toMatch(/^#[0-9A-F]{6}$/i);
     }
   });
 
-  it('never lets a kind wear the brand colour', () => {
-    // primary carries actions, key numbers, the FAB and the active tab. A kind
-    // wearing it collapses "what this is" into "what you can do".
-    for (const kind of STOP_KINDS) {
-      expect(theme.kind[kind].toUpperCase()).not.toBe(theme.role.primary.toUpperCase());
-    }
+  it('lifts cards in light and refuses to in dark', () => {
+    // A shadow on a near-black ground is invisible, and a glow standing in for
+    // one looks like a rendering bug. Depth in dark comes from surface + line.
+    expect(lightTheme.lift).not.toBeNull();
+    expect(darkTheme.lift).toBeNull();
   });
 
-  it('keeps every kind colour distinct', () => {
-    const used = Object.values(theme.kind).map((hex) => hex.toUpperCase());
-    expect(new Set(used).size).toBe(used.length);
-  });
-
-  it('keeps the ground darker than the card surface', () => {
-    // On a dark UI the floor must sit BELOW the cards. The previous attempt used
-    // the brand plum as the ground, which left cards nothing to rise from.
-    const luminance = (hex: string) =>
-      Number.parseInt(hex.slice(1, 3), 16) +
-      Number.parseInt(hex.slice(3, 5), 16) +
-      Number.parseInt(hex.slice(5, 7), 16);
-
-    expect(luminance(theme.role.ground)).toBeLessThan(luminance(theme.role.surface));
+  it('is reachable by name', () => {
+    expect(themes.light).toBe(lightTheme);
+    expect(themes.dark).toBe(darkTheme);
   });
 });
