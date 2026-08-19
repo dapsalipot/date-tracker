@@ -166,7 +166,7 @@ export default function DateDetail() {
                   >
                     <Ionicons name="chevron-down-outline" size={18} color={t.role.inkMuted} />
                   </Pressable>
-                  <Text style={{ ...theme.type.body, color: t.role.ink, fontWeight: '700' }}>
+                  <Text style={{ ...theme.type.body, color: t.role.ink, fontFamily: theme.type.micro.fontFamily }}>
                     {formatMoney(money(item.amountMinor, item.currencyCode))}
                   </Text>
                 </View>

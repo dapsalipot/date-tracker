@@ -403,7 +403,7 @@ export default function Feed() {
           ListEmptyComponent={
             drafts.length === 0 && published.length === 0 ? (
               <Card onPress={() => seedTwelveMonths(db, ctx.coupleId, ctx.userId, todayLocal, deps)}>
-                <Text style={{ ...theme.type.body, fontWeight: '600', color: t.role.ink, textAlign: 'center' }}>
+                <Text style={{ ...theme.type.body, fontFamily: theme.type.meta.fontFamily, color: t.role.ink, textAlign: 'center' }}>
                   Seed 12 months of demo dates
                 </Text>
               </Card>
@@ -479,7 +479,7 @@ function MonthHeader({ section, currencyCode }: { section: MonthSection; currenc
         <Ionicons name="calendar-outline" size={14} color={t.role.inkMuted} />
         <MicroLabel>{section.title.toUpperCase()}</MicroLabel>
       </View>
-      <Text style={{ ...theme.type.body, color: t.role.ink, fontWeight: '600' }}>
+      <Text style={{ ...theme.type.body, color: t.role.ink, fontFamily: theme.type.meta.fontFamily }}>
         {formatMoney(money(section.totalMinor, currencyCode))}
       </Text>
     </View>

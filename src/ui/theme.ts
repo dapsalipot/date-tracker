@@ -1,9 +1,16 @@
+const family = {
+  regular: 'Nunito_400Regular',
+  semi: 'Nunito_600SemiBold',
+  bold: 'Nunito_700Bold',
+  extra: 'Nunito_800ExtraBold',
+} as const;
+
 const type = {
-  display: { fontSize: 34, lineHeight: 38, letterSpacing: 0, fontWeight: '800' as const },
-  title: { fontSize: 22, lineHeight: 28, letterSpacing: 0, fontWeight: '800' as const },
-  body: { fontSize: 16, lineHeight: 24, letterSpacing: 0, fontWeight: '400' as const },
-  meta: { fontSize: 13, lineHeight: 18, letterSpacing: 0, fontWeight: '600' as const },
-  micro: { fontSize: 11, lineHeight: 14, letterSpacing: 1.5, fontWeight: '700' as const },
+  display: { fontSize: 34, lineHeight: 38, letterSpacing: 0, fontFamily: family.extra },
+  title: { fontSize: 22, lineHeight: 28, letterSpacing: 0, fontFamily: family.extra },
+  body: { fontSize: 16, lineHeight: 24, letterSpacing: 0, fontFamily: family.regular },
+  meta: { fontSize: 13, lineHeight: 18, letterSpacing: 0, fontFamily: family.semi },
+  micro: { fontSize: 11, lineHeight: 14, letterSpacing: 1.5, fontFamily: family.bold },
 } as const;
 
 const motion = { fast: 120, base: 220 } as const;

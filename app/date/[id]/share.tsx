@@ -149,7 +149,6 @@ export default function Share() {
                   <Text
                     style={{
                       ...theme.type.meta,
-                      fontWeight: '600',
                       color: selected ? t.role.onPrimary : t.role.inkMuted,
                     }}
                   >
@@ -183,7 +182,6 @@ export default function Share() {
                   <Text
                     style={{
                       ...theme.type.meta,
-                      fontWeight: '600',
                       color: selected ? t.role.onPrimary : t.role.inkMuted,
                     }}
                   >

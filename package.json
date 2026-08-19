@@ -3,6 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
+    "@expo-google-fonts/nunito": "^0.4.2",
     "@expo/ui": "~57.0.8",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-ml-kit/text-recognition": "^2.0.0",
@@ -21,7 +22,7 @@
     "expo-linking": "~57.0.4",
     "expo-router": "~57.0.9",
     "expo-sharing": "~57.0.11",
-    "expo-splash-screen": "~57.0.5",
+    "expo-splash-screen": "~57.0.7",
     "expo-sqlite": "~57.0.1",
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.1",

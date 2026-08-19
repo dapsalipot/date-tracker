@@ -43,7 +43,7 @@ export function Bar({ label, value, fraction, tint, segments, onPress }: Props) 
   return (
     <Pressable onPress={onPress} disabled={!onPress} style={{ gap: theme.space.xs }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={{ color: t.role.ink, fontWeight: '600' }}>{label}</Text>
+        <Text style={{ ...theme.type.meta, color: t.role.ink }}>{label}</Text>
         <Text style={{ color: t.role.inkMuted }}>{value}</Text>
       </View>
       <View

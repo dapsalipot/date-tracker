@@ -163,7 +163,7 @@ export default function StopEditor() {
             }}
           >
             <KindIcon kind={stop.kind} size={14} color={tint} />
-            <Text style={{ ...theme.type.meta, fontWeight: '600', color: tint }}>{kindLabel(stop.kind)}</Text>
+            <Text style={{ ...theme.type.meta, color: tint }}>{kindLabel(stop.kind)}</Text>
           </View>
         </View>
 

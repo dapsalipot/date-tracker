@@ -49,7 +49,7 @@ export function SubkindChips({ kind, selected, onSelect }: Props) {
             }}
           >
             <KindIcon kind={kind} size={14} color={isSelected ? tint : t.role.inkMuted} />
-            <Text style={{ ...theme.type.meta, fontWeight: '600', color: isSelected ? tint : t.role.inkMuted }}>
+            <Text style={{ ...theme.type.meta, color: isSelected ? tint : t.role.inkMuted }}>
               {option}
             </Text>
           </Pressable>

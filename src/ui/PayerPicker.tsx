@@ -92,7 +92,7 @@ export function PayerPicker({ people, selected, onSelect, onAdd }: Props) {
         <Text style={{ ...theme.type.meta, color: t.role.inkMuted }}>Cancel</Text>
       </Pressable>
       <Pressable onPress={confirmName} disabled={!canConfirm} hitSlop={8}>
-        <Text style={{ ...theme.type.meta, fontWeight: '600', color: canConfirm ? t.role.primary : t.role.inkMuted }}>
+        <Text style={{ ...theme.type.meta, color: canConfirm ? t.role.primary : t.role.inkMuted }}>
           Add
         </Text>
       </Pressable>
@@ -133,7 +133,7 @@ export function PayerPicker({ people, selected, onSelect, onAdd }: Props) {
               borderColor: isSelected ? t.role.primary : t.role.line,
             }}
           >
-            <Text style={{ ...theme.type.meta, fontWeight: '600', color: isSelected ? t.role.primary : t.role.inkMuted }}>
+            <Text style={{ ...theme.type.meta, color: isSelected ? t.role.primary : t.role.inkMuted }}>
               {person.displayName}
             </Text>
           </Pressable>

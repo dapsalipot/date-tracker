@@ -1,12 +1,23 @@
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Text, View } from 'react-native';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
+import {
+  useFonts,
+  Nunito_400Regular,
+  Nunito_600SemiBold,
+  Nunito_700Bold,
+  Nunito_800ExtraBold,
+} from '@expo-google-fonts/nunito';
+import * as SplashScreen from 'expo-splash-screen';
 import migrations from '../drizzle/migrations';
 import { migrationDb } from '@/db/client';
 import { Card } from '@/ui/Card';
 import { theme } from '@/ui/theme';
 import { ThemeProvider, useTheme } from '@/ui/ThemeProvider';
+
+void SplashScreen.preventAutoHideAsync();
 
 /**
  * Everything ThemeProvider wraps, including the migration gate itself.
@@ -27,7 +38,7 @@ function AppGate() {
     return (
       <View style={{ flex: 1, justifyContent: 'center', padding: theme.space.lg, backgroundColor: t.role.ground }}>
         <Card>
-          <Text style={{ ...theme.type.body, fontWeight: '700', color: t.role.ink }}>Database update failed</Text>
+          <Text style={{ ...theme.type.body, fontFamily: theme.type.micro.fontFamily, color: t.role.ink }}>Database update failed</Text>
           <Text style={{ ...theme.type.meta, color: t.role.inkMuted, marginTop: theme.space.sm }}>{error.message}</Text>
         </Card>
       </View>
@@ -54,7 +65,7 @@ function AppGate() {
       screenOptions={{
         headerStyle: { backgroundColor: t.role.surface },
         headerTintColor: t.role.ink,
-        headerTitleStyle: { fontWeight: '700' },
+        headerTitleStyle: { fontFamily: theme.type.micro.fontFamily },
         headerShadowVisible: false,
         contentStyle: { backgroundColor: t.role.ground },
       }}
@@ -70,6 +81,25 @@ function AppGate() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Nunito_400Regular,
+    Nunito_600SemiBold,
+    Nunito_700Bold,
+    Nunito_800ExtraBold,
+  });
+
+  useEffect(() => {
+    // Holding the splash until the font resolves avoids a flash of system font
+    // reflowing into Nunito, which is more jarring than a slightly longer splash.
+    if (fontsLoaded) void SplashScreen.hideAsync();
+  }, [fontsLoaded]);
+
+  // Nothing has mounted yet (still covered by the native splash screen), so
+  // this isn't an unthemed branch — it's the same "nothing rendered" moment
+  // that existed before first paint anyway. ThemeProvider keeps wrapping the
+  // whole tree, migration gate included, once we get past this point.
+  if (!fontsLoaded) return null;
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>

@@ -80,7 +80,7 @@ export function AmountKeypad({ value, onChange, currencyCode, placeholder }: Pro
       <Text
         style={{
           fontSize: 44,
-          fontWeight: '800',
+          fontFamily: theme.type.display.fontFamily,
           textAlign: 'center',
           paddingVertical: theme.space.md,
           color: showingPlaceholder ? t.role.inkMuted : t.role.primary,
@@ -98,7 +98,7 @@ export function AmountKeypad({ value, onChange, currencyCode, placeholder }: Pro
             {key === '⌫' ? (
               <Ionicons name="backspace-outline" size={22} color={t.role.ink} />
             ) : (
-              <Text style={{ ...theme.type.title, fontWeight: '600', color: t.role.ink }}>{key}</Text>
+              <Text style={{ ...theme.type.title, fontFamily: theme.type.meta.fontFamily, color: t.role.ink }}>{key}</Text>
             )}
           </Pressable>
         ))}

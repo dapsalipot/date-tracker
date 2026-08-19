@@ -66,7 +66,7 @@ export function Button({
         animated,
       ]}
     >
-      <Text style={{ ...theme.type.body, fontWeight: '600', color: surface.text }}>{label}</Text>
+      <Text style={{ ...theme.type.body, fontFamily: theme.type.meta.fontFamily, color: surface.text }}>{label}</Text>
     </AnimatedPressable>
   );
 }
