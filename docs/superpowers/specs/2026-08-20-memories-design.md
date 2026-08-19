@@ -131,7 +131,11 @@ No new visual concepts. This phase adds screens, not a style.
 - Every new query is couple-scoped, respects `deleted_at` on both dates and stops, and is proven
   by a mutation that must fail a test — the pattern established in Phase 1.
 - Streak logic is a pure function over strings, tested with no database at all.
-- No new dependency. A date picker uses the platform one already available through React Native.
+- No new dependency. **Amended 2026-08-20, before implementation:** this originally said the date
+  picker would use "the platform one already available through React Native". That is wrong —
+  React Native ships no date picker, and `@react-native-community/datetimepicker` would be both a
+  new dependency and a native rebuild. The app already owns `CalendarGrid`; the picker reuses it,
+  which costs nothing and matches the rest of the app by construction.
 
 ## 10. Testing
 
