@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { splitHero } from './rhythm';
+import { buildFeedRows, splitHero } from './rhythm';
 
 const d = (id: string, occurredOn: string, status = 'published') =>
   ({ id, occurredOn, status, title: null, stopCount: 1, totalMinor: 1, currencyCode: 'PHP',
@@ -41,5 +41,20 @@ describe('splitHero', () => {
     const input = [d('a', '2026-08-17'), d('b', '2026-08-02'), d('c', '2026-08-09')];
     const { hero, rest } = splitHero(input);
     expect([...(hero ? [hero.id] : []), ...rest.map((r) => r.id)].sort()).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('buildFeedRows', () => {
+  it('leads with a hero row, then pairs the rest in their original order', () => {
+    const rows = buildFeedRows([d('a', '2026-08-17'), d('b', '2026-08-02'), d('c', '2026-08-09')]);
+    expect(rows).toEqual([
+      { type: 'hero', date: d('a', '2026-08-17') },
+      { type: 'pair', dates: [d('b', '2026-08-02'), d('c', '2026-08-09')] },
+    ]);
+  });
+
+  it('has no hero row when nothing is published, just a pair row', () => {
+    const rows = buildFeedRows([d('draft', '2026-08-18', 'draft')]);
+    expect(rows).toEqual([{ type: 'pair', dates: [d('draft', '2026-08-18', 'draft')] }]);
   });
 });

@@ -3,6 +3,7 @@ import { Image, Pressable, Text, View } from 'react-native';
 import type { DaySpend } from '@/domain/analytics/daily';
 import { Card } from '@/ui/Card';
 import { isStopKind } from '@/ui/KindIcon';
+import { ON_PHOTO, PHOTO_SCRIM } from '@/ui/photoOverlay';
 import { theme } from '@/ui/theme';
 import { useTheme } from '@/ui/ThemeProvider';
 import { tap } from '@/ui/feedback';
@@ -18,19 +19,6 @@ const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
  * month's busiest day gets MAX — a day with no spend gets no tint at all. */
 const MIN_ALPHA = 0.18;
 const MAX_ALPHA = 0.6;
-
-/**
- * Deliberately not theme tokens — same category as the receipt export's fixed
- * palette (`theme.ts`): a surface outside the theme system needs colours
- * outside the theme system. This scrim sits on a photograph, not on the
- * theme's surface, and a photo looks the same in both themes. `t.role.onPrimary`
- * is `#FFFFFF` in light but `#1A1206` in dark — a "properly themed" numeral
- * would go near-black in dark mode, on a dark scrim, over a possibly-dark
- * photo, and disappear. White on black is legible over any image in either
- * theme, which is exactly why these are fixed rather than themed.
- */
-const PHOTO_SCRIM = 'rgba(0,0,0,0.45)';
-const ON_PHOTO = '#FFFFFF';
 
 /** "2026-08" -> "August 2026", off the key's own digits — never a `Date`. */
 function monthLabel(periodMonth: string): string {

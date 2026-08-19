@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { createTestDb, testDeps } from '@/test/testDb';
 import { dates, photos, stops } from '@/db/schema';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
-import { captureStop, listFeedDates } from '@/domain/dates/repository';
+import { captureStop, listFeedDates, toFeedDate } from '@/domain/dates/repository';
 import { attachPhoto } from '@/domain/photos/repository';
 import { listDraftDates, listQueuedStops, publishedDatesQuery } from './drafts';
 
@@ -153,6 +153,37 @@ describe('publishedDatesQuery cover photo', () => {
 
     expect(feed).toHaveLength(1);
     expect(feed[0]?.kinds).toEqual([]);
+  });
+
+  it('lists distinct places and counts distinct payers on the query the feed actually subscribes to', () => {
+    const { db, ctx } = setup();
+    const partnerId = 'partner-user';
+    const captured = captureStop(db, AUG_3, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'food', amountMinor: 10000, currencyCode: 'PHP', placeName: 'Cafe Ysabel',
+    });
+    captureStop(db, AUG_3, {
+      coupleId: ctx.coupleId, userId: ctx.userId,
+      kind: 'activity', amountMinor: 20000, currencyCode: 'PHP', placeName: 'Cafe Ysabel',
+    });
+    captureStop(db, AUG_3, {
+      coupleId: ctx.coupleId, userId: partnerId,
+      kind: 'transport', amountMinor: 5000, currencyCode: 'PHP', placeName: 'Grab',
+    });
+    db.update(dates).set({ title: 'Tagaytay', status: 'published' }).where(eq(dates.id, captured.dateId)).run();
+
+    // publishedDatesQuery is `scopedQuery` in this file, not `feedDatesQuery`
+    // in repository.ts — this is the query app/(tabs)/index.tsx actually
+    // subscribes to via useLiveQuery, so it needs its own coverage rather
+    // than relying on repository.test.ts exercising a parallel query.
+    const row = publishedDatesQuery(db, ctx).all()[0];
+    const feed = toFeedDate(row!, ctx.currencyCode);
+
+    // group_concat(distinct ...) must collapse the repeated "Cafe Ysabel".
+    expect(feed.places).toEqual(['Cafe Ysabel', 'Grab']);
+    // Two distinct payers even though one of them paid for two of the three
+    // stops — counting stops instead of distinct payers would read 3 here.
+    expect(feed.payerCount).toBe(2);
   });
 
   it('reports no cover for a date that has none', () => {

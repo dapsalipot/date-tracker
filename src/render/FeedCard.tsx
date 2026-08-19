@@ -3,6 +3,7 @@ import type { FeedDate } from '@/domain/dates/repository';
 import { formatMoney, money } from '@/domain/money/money';
 import { Card } from '@/ui/Card';
 import { KindIcon } from '@/ui/KindIcon';
+import { ON_PHOTO, ON_PHOTO_MUTED, PHOTO_SCRIM } from '@/ui/photoOverlay';
 import { theme } from '@/ui/theme';
 import { useTheme } from '@/ui/ThemeProvider';
 import { tap } from '@/ui/feedback';
@@ -123,13 +124,13 @@ export function FeedHero({ date, onPress }: Props) {
 
   const caption = (
     <>
-      <Text style={{ ...theme.type.display, color: hasCover ? '#FFFFFF' : t.role.ink }} numberOfLines={1}>
+      <Text style={{ ...theme.type.display, color: hasCover ? ON_PHOTO : t.role.ink }} numberOfLines={1}>
         {date.title ?? 'Untitled date'}
       </Text>
       <Text
         style={{
           ...theme.type.meta,
-          color: hasCover ? 'rgba(255,255,255,0.85)' : t.role.inkMuted,
+          color: hasCover ? ON_PHOTO_MUTED : t.role.inkMuted,
           marginTop: theme.space.xs,
         }}
       >
@@ -142,7 +143,9 @@ export function FeedHero({ date, onPress }: Props) {
     <Pressable
       onPress={() => { tap(); onPress(); }}
       style={{
-        borderRadius: theme.radius.xl,
+        // Same radius as every other card — the hero is bigger, not a
+        // different shape.
+        borderRadius: theme.radius.lg,
         overflow: 'hidden',
         backgroundColor: t.role.surface,
         borderWidth: 1,
@@ -156,7 +159,7 @@ export function FeedHero({ date, onPress }: Props) {
           <View
             style={{
               position: 'absolute', left: 0, right: 0, bottom: 0,
-              padding: theme.space.md, backgroundColor: 'rgba(0,0,0,0.45)',
+              padding: theme.space.md, backgroundColor: PHOTO_SCRIM,
             }}
           >
             {caption}
