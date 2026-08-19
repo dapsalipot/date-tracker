@@ -8,6 +8,7 @@ import { dateDetailQuery } from '@/domain/dates/compose';
 import { photosForDateQuery } from '@/domain/photos/repository';
 import { reorderStops, stopsForDateQuery } from '@/domain/stops/edit';
 import { formatMoney, money } from '@/domain/money/money';
+import { photoUri } from '@/media/store';
 import { getAppDeps } from '@/session';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
@@ -96,7 +97,7 @@ export default function DateDetail() {
                     }}
                   >
                     <Image
-                      source={{ uri: photo.localUri }}
+                      source={{ uri: photoUri(photo.localUri) }}
                       style={{ width: '100%', height: '100%' }}
                       resizeMode="cover"
                     />

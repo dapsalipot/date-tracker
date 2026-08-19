@@ -3,6 +3,7 @@ import { Image, Pressable, Text, View } from 'react-native';
 import type { DaySpend } from '@/domain/analytics/daily';
 import { Card } from '@/ui/Card';
 import { isStopKind } from '@/ui/KindIcon';
+import { photoUri } from '@/media/store';
 import { ON_PHOTO, PHOTO_SCRIM } from '@/ui/photoOverlay';
 import { theme } from '@/ui/theme';
 import { useTheme } from '@/ui/ThemeProvider';
@@ -147,7 +148,11 @@ export function CalendarGrid({
               if (iso === null) return <View key={`blank-${i}-${j}`} style={{ flex: 1, aspectRatio: 1 }} />;
 
               const spend = byDay.get(iso);
-              const coverUri = covers.get(iso);
+              const storedCover = covers.get(iso);
+              // Resolved against the *current* documents directory — keyed
+              // and rendered by this same resolved value below, not the
+              // stored one, so the failed-load fallback stays consistent.
+              const coverUri = storedCover !== undefined ? photoUri(storedCover) : undefined;
               const dayNum = Number.parseInt(iso.slice(8, 10), 10);
               const isToday = iso === todayLocal;
               const isSelected = iso === selectedDay;

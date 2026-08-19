@@ -9,7 +9,7 @@ import { db } from '@/db/client';
 import { dateDetailQuery, loadDateDetail, publishDate, updateDateDetails } from '@/domain/dates/compose';
 import { setCoverPhoto } from '@/domain/dates/cover';
 import { attachPhoto, detachPhoto, photosForDateQuery } from '@/domain/photos/repository';
-import { persistPickedImage } from '@/media/store';
+import { persistPickedImage, photoUri } from '@/media/store';
 import { getAppDeps } from '@/session';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
@@ -151,7 +151,7 @@ export default function Compose() {
                   }}
                 >
                   {photo.localUri !== null && (
-                    <Image source={{ uri: photo.localUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    <Image source={{ uri: photoUri(photo.localUri) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                   )}
                   {isCover && (
                     <View

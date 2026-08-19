@@ -4,6 +4,7 @@ import type { FeedDate } from '@/domain/dates/repository';
 import { formatMoney, money } from '@/domain/money/money';
 import { AnimatedPressable, Card, usePressScale } from '@/ui/Card';
 import { KindIcon } from '@/ui/KindIcon';
+import { photoUri } from '@/media/store';
 import { ON_PHOTO, ON_PHOTO_MUTED, PHOTO_SCRIM } from '@/ui/photoOverlay';
 import { theme } from '@/ui/theme';
 import { useTheme } from '@/ui/ThemeProvider';
@@ -66,7 +67,12 @@ export function FeedCard({ date, onPress }: Props) {
   const stopLabel = date.stopCount === 1 ? '1 stop' : `${date.stopCount} stops`;
 
   return (
-    <Card padded={false} onPress={onPress} photoUri={date.coverUri} photoHeight={COVER_HEIGHT}>
+    <Card
+      padded={false}
+      onPress={onPress}
+      photoUri={date.coverUri !== null ? photoUri(date.coverUri) : null}
+      photoHeight={COVER_HEIGHT}
+    >
       <View style={{ padding: theme.space.md }}>
         {/*
           V3 fix: at two-up width there isn't room for the title and the
@@ -132,13 +138,17 @@ export function FeedHero({ date, onPress }: Props) {
   const { animatedStyle, onPressIn, onPressOut } = usePressScale();
   const total = formatMoney(money(date.totalMinor, date.currencyCode));
   const stopLabel = date.stopCount === 1 ? '1 stop' : `${date.stopCount} stops`;
+  // Resolved against the *current* documents directory — the failed-load
+  // tracking below is keyed by this same resolved value, not the stored
+  // one, so the two stay consistent.
+  const resolvedCoverUri = date.coverUri !== null ? photoUri(date.coverUri) : null;
   // Same failed-load tracking `CalendarGrid` uses for its day cells: a stale
   // absolute path fails to load, and without this the hero would keep trying
   // to render a photo layout (scrim + white text) over nothing. Stored as
   // the failed uri itself, not a boolean, so a new hero date with a working
   // cover isn't stuck coverless by a previous date's failure.
   const [failedCoverUri, setFailedCoverUri] = useState<string | null>(null);
-  const hasCover = date.coverUri !== null && date.coverUri !== failedCoverUri;
+  const hasCover = resolvedCoverUri !== null && resolvedCoverUri !== failedCoverUri;
 
   const caption = (
     <>
@@ -187,10 +197,10 @@ export function FeedHero({ date, onPress }: Props) {
         {hasCover ? (
           <View style={{ width: '100%', aspectRatio: HERO_ASPECT }}>
             <Image
-              source={{ uri: date.coverUri as string }}
+              source={{ uri: resolvedCoverUri as string }}
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
-              onError={() => setFailedCoverUri(date.coverUri)}
+              onError={() => setFailedCoverUri(resolvedCoverUri)}
             />
             <View
               style={{
