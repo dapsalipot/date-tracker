@@ -89,13 +89,20 @@ export default function Memories() {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: theme.space.md, paddingBottom: listBottomInset, gap: theme.space.md }}
       >
+        {/* Rule: a Card holds content, never other Cards. FeedCard is
+            already a Card (border, hairline, lift shadow), so a section
+            that just lists dates puts its heading bare on the ground —
+            same as the feed's MonthHeader — rather than nesting a second
+            Card around it. Streak below is the one exception: it holds a
+            number and a caption, not another Card, so one level is correct. */}
+
         {/* On this day: absent entirely when empty, not a permanent empty card
             nobody needs to see until the app is a year old. */}
         {onThisDayDates.length > 0 && (
-          <Card>
+          <View>
             <MicroLabel>ON THIS DAY</MicroLabel>
             <DateStack dates={onThisDayDates} />
-          </Card>
+          </View>
         )}
 
         {/* Streak: always renders — a truthful small number is fine to show. */}
@@ -120,26 +127,33 @@ export default function Memories() {
 
         {/* Milestones: only the ones reached — no locked-achievement slots. */}
         {milestoneList.length > 0 && (
-          <Card>
+          <View>
             <MicroLabel>MILESTONES</MicroLabel>
             {milestoneList.map((milestone) => (
               <MilestoneRow key={milestone.kind} milestone={milestone} />
             ))}
-          </Card>
+          </View>
         )}
 
         {/* Favourites: always renders — an invite to rate is the one thing
-            here actionable on day one. */}
-        <Card>
+            here actionable on day one. Empty state is the exception to the
+            no-nested-Card rule: with no dates there's nothing to put on the
+            ground, and bare floating text is the other thing this user has
+            flagged before, so it gets a Card of its own. */}
+        <View>
           <MicroLabel>FAVOURITES</MicroLabel>
           {favouriteDates.length === 0 ? (
-            <Text style={{ ...theme.type.body, color: t.role.inkMuted, marginTop: theme.space.xs }}>
-              Rate a date to see your favourites here.
-            </Text>
+            <View style={{ marginTop: theme.space.sm }}>
+              <Card>
+                <Text style={{ ...theme.type.body, color: t.role.inkMuted, textAlign: 'center' }}>
+                  Rate a date to see your favourites here.
+                </Text>
+              </Card>
+            </View>
           ) : (
             <DateStack dates={favouriteDates} />
           )}
-        </Card>
+        </View>
       </ScrollView>
     </Screen>
   );
