@@ -6,8 +6,9 @@ import { useTheme } from '@/ui/ThemeProvider';
 /**
  * `headerShown: false` is safe here in a way it was not at the root Stack: a
  * tab screen is always reachable from the tab bar, so it can never become a
- * screen with no way out. Both screens draw their own heading anyway — the
- * feed its "Our dates" title, the dashboard its month stepper.
+ * screen with no way out. Each screen draws its own heading anyway — the
+ * feed its search bar and calendar, the dashboard its month stepper, memories
+ * its per-section `MicroLabel`s.
  *
  * Filled glyph when focused, outline when not — `tabBarActiveTintColor`
  * already colours the active tab `role.primary`, so the shape change is what
@@ -40,6 +41,15 @@ export default function TabsLayout() {
           title: 'Spending',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'stats-chart' : 'stats-chart-outline'} size={20} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="memories"
+        options={{
+          title: 'Memories',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'sparkles' : 'sparkles-outline'} size={20} color={color} />
           ),
         }}
       />
