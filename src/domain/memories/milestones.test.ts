@@ -117,4 +117,18 @@ describe('milestones', () => {
     const other = { coupleId: 'someone-else', currencyCode: ctx.currencyCode };
     expect(milestones(db, other)).toEqual([]);
   });
+
+  it('excludes a draft even when it would otherwise win a milestone', () => {
+    // Earliest by day, but a draft: it would take 'first' if status weren't
+    // filtered. Mirrors onThisDay.test.ts's "excludes drafts" case.
+    const db = createTestDb();
+    const ctx = ensureLocalContext(db, DEPS);
+    seedDatedStops(db, ctx.coupleId, '2024-01-01', [100], { status: 'draft' });
+    const earliestPublishedId = seedDatedStops(db, ctx.coupleId, '2024-02-01', [100]);
+    seedDatedStops(db, ctx.coupleId, '2024-03-01', [100]);
+
+    const all = milestones(db, ctx);
+    expect(found(all, 'first')?.date.occurredOn).toBe('2024-02-01');
+    expect(found(all, 'first')?.date.id).toBe(earliestPublishedId);
+  });
 });
