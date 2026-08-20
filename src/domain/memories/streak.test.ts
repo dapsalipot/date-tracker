@@ -59,4 +59,21 @@ describe('weekStreak', () => {
     const s = weekStreak(['2026-08-03', '2026-08-17', '2026-08-10'], MONDAY);
     expect(s.current).toBe(3);
   });
+
+  it('does not let a repeated date inside a run break the longest streak', () => {
+    // Three consecutive weeks (08-03, 08-10, 08-17), with 08-10 and 08-12
+    // both landing in the middle week. That duplicate week-start matters
+    // specifically because it falls *inside* an already-accumulating run:
+    // an implementation that scans the sorted week list positionally
+    // (instead of deduping first) hits the duplicate mid-run, resets its
+    // run counter to 1, and only climbs back to 2 by the end — undercounting
+    // longest as 2 instead of 3. A two-week fixture can't catch this, since
+    // there's no accumulated run yet for the duplicate to interrupt. Do not
+    // simplify this down to two weeks; that would silently drop the guard.
+    const s = weekStreak(
+      ['2026-08-17', '2026-08-10', '2026-08-12', '2026-08-03'],
+      MONDAY,
+    );
+    expect(s.longest).toBe(3);
+  });
 });
