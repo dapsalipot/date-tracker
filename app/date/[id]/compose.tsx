@@ -6,12 +6,15 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { db } from '@/db/client';
+import type { DaySpend } from '@/domain/analytics/daily';
+import { shiftMonth } from '@/domain/analytics/period';
 import { dateDetailQuery, loadDateDetail, publishDate, updateDateDetails } from '@/domain/dates/compose';
 import { setCoverPhoto } from '@/domain/dates/cover';
 import { attachPhoto, detachPhoto, photosForDateQuery } from '@/domain/photos/repository';
 import { persistPickedImage, photoUri } from '@/media/store';
 import { getAppDeps } from '@/session';
 import { Button } from '@/ui/Button';
+import { CalendarGrid } from '@/ui/CalendarGrid';
 import { Card } from '@/ui/Card';
 import { MicroLabel } from '@/ui/MicroLabel';
 import { theme } from '@/ui/theme';
@@ -20,6 +23,12 @@ import { commit } from '@/ui/feedback';
 
 const PHOTO_WIDTH = 84;
 const PHOTO_HEIGHT = 105;
+
+// Stable empty collections for the day picker's CalendarGrid: this screen has
+// no spend/cover data to tint cells with, and a fresh [] / Map() literal each
+// render would needlessly bust the grid's own useMemo over `days`.
+const NO_DAYS: DaySpend[] = [];
+const NO_COVERS: ReadonlyMap<string, string> = new Map();
 
 export default function Compose() {
   const t = useTheme();
@@ -32,6 +41,11 @@ export default function Compose() {
   const [adding, setAdding] = useState(false);
 
   const [title, setTitle] = useState(detail?.title ?? '');
+
+  const todayLocal = deps.clock.todayLocal();
+  const currentMonth = todayLocal.slice(0, 7);
+  const [dayPickerOpen, setDayPickerOpen] = useState(false);
+  const [pickerMonth, setPickerMonth] = useState(() => (detail?.occurredOn ?? todayLocal).slice(0, 7));
 
   if (!detail) {
     return (
@@ -77,6 +91,25 @@ export default function Compose() {
     }
   };
 
+  // Reactive, like coverPhotoId above: `detail` is a one-shot read from
+  // mount, so once a day is picked below, the row and grid need the live
+  // query's value to show the move without leaving and re-entering the screen.
+  const occurredOn = detailRows[0]?.occurredOn ?? detail.occurredOn;
+
+  // updateDateDetails throws on a malformed value or a future date. The grid
+  // below can't produce a malformed value, and canStepForward keeps it out of
+  // future months, but a future day within the *current* month is still one
+  // tap away — this is the guard for that near-impossible-but-not-impossible case.
+  const pickDay = (day: string) => {
+    try {
+      updateDateDetails(db, deps, id, { occurredOn: day });
+      commit();
+      setDayPickerOpen(false);
+    } catch (err) {
+      Alert.alert('Could not move this date', err instanceof Error ? err.message : 'Something went wrong.');
+    }
+  };
+
   // setCoverPhoto validates that the photo still belongs to this date and
   // throws if not — a stale list racing a delete. An unhandled throw inside
   // an onPress is a redbox in development and a silent no-op in production,
@@ -108,7 +141,7 @@ export default function Compose() {
     <SafeAreaView style={{ flex: 1, backgroundColor: t.role.ground }}>
       <ScrollView contentContainerStyle={{ padding: theme.space.md, gap: theme.space.md }}>
         <Card>
-          <MicroLabel>{detail.occurredOn.toUpperCase()}</MicroLabel>
+          <MicroLabel>{occurredOn.toUpperCase()}</MicroLabel>
           <TextInput
             value={title}
             onChangeText={setTitle}
@@ -121,6 +154,31 @@ export default function Compose() {
             style={{ ...theme.type.title, color: t.role.ink, paddingVertical: theme.space.sm }}
           />
         </Card>
+
+        <Card onPress={() => setDayPickerOpen((open) => !open)}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View>
+              <MicroLabel>DATE</MicroLabel>
+              <Text style={{ ...theme.type.body, color: t.role.ink, marginTop: theme.space.xs }}>
+                {occurredOn}
+              </Text>
+            </View>
+            <Ionicons name={dayPickerOpen ? 'chevron-up' : 'chevron-down'} size={18} color={t.role.inkMuted} />
+          </View>
+        </Card>
+
+        {dayPickerOpen && (
+          <CalendarGrid
+            periodMonth={pickerMonth}
+            todayLocal={todayLocal}
+            days={NO_DAYS}
+            covers={NO_COVERS}
+            selectedDay={occurredOn}
+            onSelectDay={pickDay}
+            onStepMonth={(delta) => setPickerMonth((p) => shiftMonth(p, delta))}
+            canStepForward={pickerMonth !== currentMonth}
+          />
+        )}
 
         <Card>
           <MicroLabel>PHOTOS</MicroLabel>
