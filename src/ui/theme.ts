@@ -46,4 +46,11 @@ export const theme = {
   space: { xs: 4, sm: 8, md: 16, lg: 24, xl: 40, xxl: 64 },
   radius: { sm: 8, md: 12, lg: 18, xl: 24 },
   screenMargin: 20,
+  /**
+   * A standard iOS tab bar is 49pt above the home-indicator inset. `Screen`
+   * sets safe-area edges to top/left/right only, deliberately — the tab bar
+   * draws over the content — so anything scrollable has to add that room
+   * back itself or its last row is clipped by the bar.
+   */
+  tabBarHeight: 49,
 } as const;

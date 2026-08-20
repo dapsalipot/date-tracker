@@ -45,6 +45,16 @@ describe('favourites', () => {
     expect(ids(favourites(db, ctx))).not.toContain(ratedThree);
   });
 
+  it('excludes a date rated exactly 3', () => {
+    // Hard-coded, not parameterised by FAVOURITE_THRESHOLD: a lowered
+    // threshold (4 -> 3) must not silently start admitting this rating.
+    const db = createTestDb();
+    const ctx = ensureLocalContext(db, DEPS);
+    const ratedThree = seedDate(db, ctx.coupleId, '2026-08-10', { rating: 3 });
+
+    expect(ids(favourites(db, ctx))).not.toContain(ratedThree);
+  });
+
   it('excludes an unrated date', () => {
     // rating is null for every date until someone rates it, and null must not
     // compare as greater than anything.

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { dates, stops } from '@/db/schema';
 import type { AppDatabase } from '@/db/types';
 import { createTestDb, testDeps } from '@/test/testDb';
@@ -130,5 +131,21 @@ describe('milestones', () => {
     const all = milestones(db, ctx);
     expect(found(all, 'first')?.date.occurredOn).toBe('2024-02-01');
     expect(found(all, 'first')?.date.id).toBe(earliestPublishedId);
+  });
+
+  it('excludes a tombstoned date even when it would otherwise win a milestone', () => {
+    // Earliest by day, but soft-deleted: it would take 'first' if
+    // feedDateSelection's deletedAt filter weren't applied. Mirrors
+    // favourites.test.ts's "excludes drafts and tombstoned dates" case.
+    const db = createTestDb();
+    const ctx = ensureLocalContext(db, DEPS);
+    const tombstonedId = seedDatedStops(db, ctx.coupleId, '2024-01-01', [100]);
+    db.update(dates).set({ deletedAt: 1 }).where(eq(dates.id, tombstonedId)).run();
+    const earliestLiveId = seedDatedStops(db, ctx.coupleId, '2024-02-01', [100]);
+    seedDatedStops(db, ctx.coupleId, '2024-03-01', [100]);
+
+    const all = milestones(db, ctx);
+    expect(found(all, 'first')?.date.occurredOn).toBe('2024-02-01');
+    expect(found(all, 'first')?.date.id).toBe(earliestLiveId);
   });
 });

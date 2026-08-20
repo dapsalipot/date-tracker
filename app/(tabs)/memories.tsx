@@ -18,13 +18,6 @@ import { Screen } from '@/ui/Screen';
 import { theme } from '@/ui/theme';
 import { useTheme } from '@/ui/ThemeProvider';
 
-/**
- * Same reasoning as the Dates tab (`app/(tabs)/index.tsx`): `Screen` insets
- * top/left/right only, so a scrollable body has to add the tab bar's own
- * height back itself or its last card is clipped by the bar drawn over it.
- */
-const TAB_BAR_HEIGHT = 49;
-
 function openDate(date: FeedDate) {
   router.push(`/date/${date.id}`);
 }
@@ -66,7 +59,7 @@ function weekWord(n: number): string {
 export default function Memories() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const listBottomInset = TAB_BAR_HEIGHT + insets.bottom + theme.space.md;
+  const listBottomInset = theme.tabBarHeight + insets.bottom + theme.space.md;
 
   const ctx = getLocalContext();
   const deps = getAppDeps();

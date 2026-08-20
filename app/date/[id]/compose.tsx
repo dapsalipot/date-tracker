@@ -96,7 +96,7 @@ export default function Compose() {
   // mount, so once a day is picked below, the row and grid need the live
   // query's value to show the move without leaving and re-entering the screen.
   const occurredOn = detailRows[0]?.occurredOn ?? detail.occurredOn;
-  const rating = detailRows[0]?.rating ?? detail.rating;
+  const rating = detailRows[0] ? detailRows[0].rating : detail.rating;
 
   // updateDateDetails throws on a malformed value or a future date. The grid
   // below can't produce a malformed value, and canStepForward keeps it out of

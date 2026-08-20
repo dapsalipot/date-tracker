@@ -280,14 +280,6 @@ function FeedListHeader({
   );
 }
 
-/**
- * A standard iOS tab bar is 49pt above the home-indicator inset. `Screen` sets
- * safe-area edges to top/left/right only, deliberately — the tab bar draws over
- * the content — so anything scrollable has to add that room back itself or its
- * last row is clipped by the bar.
- */
-const TAB_BAR_HEIGHT = 49;
-
 /** The add button's own footprint: its offset from the bottom plus its size. */
 const FAB_CLEARANCE = theme.space.lg + 60;
 
@@ -296,7 +288,7 @@ export default function Feed() {
   // Room for the tab bar the content scrolls under, plus the floating add
   // button, so the final card is fully readable rather than tucked behind them.
   const insets = useSafeAreaInsets();
-  const listBottomInset = TAB_BAR_HEIGHT + insets.bottom + FAB_CLEARANCE + theme.space.md;
+  const listBottomInset = theme.tabBarHeight + insets.bottom + FAB_CLEARANCE + theme.space.md;
 
   const ctx = getLocalContext();
   const deps = getAppDeps();

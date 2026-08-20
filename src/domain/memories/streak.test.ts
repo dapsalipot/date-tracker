@@ -49,6 +49,10 @@ describe('weekStreak', () => {
     );
     expect(s.current).toBe(0);
     expect(s.longest).toBe(4);
+    // The streak died in spring, not last week — endedLastWeek must not say
+    // otherwise. Pins the `current > 0` guard: without it, this becomes
+    // `!weeks.has(thisWeek)`, which is true for any dateless current week.
+    expect(s.endedLastWeek).toBe(false);
   });
 
   it('returns zeroes for no dates at all', () => {
