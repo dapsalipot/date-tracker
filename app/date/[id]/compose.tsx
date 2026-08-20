@@ -16,6 +16,7 @@ import { getAppDeps } from '@/session';
 import { Button } from '@/ui/Button';
 import { CalendarGrid } from '@/ui/CalendarGrid';
 import { Card } from '@/ui/Card';
+import { HeartRating } from '@/ui/HeartRating';
 import { MicroLabel } from '@/ui/MicroLabel';
 import { theme } from '@/ui/theme';
 import { useTheme } from '@/ui/ThemeProvider';
@@ -95,6 +96,7 @@ export default function Compose() {
   // mount, so once a day is picked below, the row and grid need the live
   // query's value to show the move without leaving and re-entering the screen.
   const occurredOn = detailRows[0]?.occurredOn ?? detail.occurredOn;
+  const rating = detailRows[0]?.rating ?? detail.rating;
 
   // updateDateDetails throws on a malformed value or a future date. The grid
   // below can't produce a malformed value, and canStepForward keeps it out of
@@ -121,6 +123,11 @@ export default function Compose() {
     } catch {
       Alert.alert('Could not set cover', 'That photo is no longer part of this date.');
     }
+  };
+
+  const rate = (next: number | null) => {
+    updateDateDetails(db, deps, id, { rating: next });
+    commit();
   };
 
   const save = (publish: boolean) => {
@@ -153,6 +160,13 @@ export default function Compose() {
             maxLength={60}
             style={{ ...theme.type.title, color: t.role.ink, paddingVertical: theme.space.sm }}
           />
+        </Card>
+
+        <Card>
+          <MicroLabel>RATING</MicroLabel>
+          <View style={{ marginTop: theme.space.sm }}>
+            <HeartRating value={rating} onChange={rate} />
+          </View>
         </Card>
 
         <Card onPress={() => setDayPickerOpen((open) => !open)}>
