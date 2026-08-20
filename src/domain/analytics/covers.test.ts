@@ -1,8 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { createTestDb, testDeps } from '@/test/testDb';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { seedTwelveMonths } from '@/fixtures/seed';
+
+/**
+ * Every test here seeds a full year through `seedTwelveMonths`, and
+ * better-sqlite3 is synchronous. Alone each runs in about a second, but vitest
+ * runs test files in parallel worker threads, so under a full-suite run they
+ * compete for a core — this file has measured 5.8s against the default 5s
+ * budget and gone red for no reason but scheduling. The work is genuinely this
+ * size, so the budget is what gets raised, and file-wide rather than
+ * test-by-test: a per-test timeout rescues whichever test lost the race that
+ * day and leaves its neighbours to fail next time.
+ */
+vi.setConfig({ testTimeout: 30_000 });
 import { attachPhoto } from '@/domain/photos/repository';
 import { setCoverPhoto } from '@/domain/dates/cover';
 import { dates, photos } from '@/db/schema';
