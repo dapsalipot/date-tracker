@@ -41,12 +41,16 @@ export function Card({
   padded = true,
   photoUri,
   photoHeight,
+  radius = theme.radius.lg,
 }: {
   children: ReactNode;
   onPress?: () => void;
   padded?: boolean;
   photoUri?: string | null;
   photoHeight?: number;
+  /** Corner radius override — the list card passes `theme.radius.md`; every
+   * other call site keeps the default `lg` hero/full-width rounding. */
+  radius?: number;
 }) {
   const t = useTheme();
   const { animatedStyle, onPressIn, onPressOut } = usePressScale();
@@ -62,7 +66,7 @@ export function Card({
   // keep the clip (radius, border, background, overflow) on an inner view so
   // the shadow can render outside the clipped bounds.
   const lift = {
-    borderRadius: theme.radius.lg,
+    borderRadius: radius,
     // Null in dark by design — a shadow on a near-black ground is invisible and
     // a glow standing in for one reads as a rendering bug.
     ...(t.lift ?? {}),
@@ -70,7 +74,7 @@ export function Card({
 
   const clip = {
     backgroundColor: t.role.surface,
-    borderRadius: theme.radius.lg,
+    borderRadius: radius,
     borderWidth: 1,
     borderColor: t.role.line,
     overflow: 'hidden' as const,

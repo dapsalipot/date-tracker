@@ -87,7 +87,7 @@ export default function Memories() {
     <Screen>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: theme.space.md, paddingBottom: listBottomInset, gap: theme.space.md }}
+        contentContainerStyle={{ paddingTop: theme.space.md, paddingBottom: listBottomInset, gap: theme.space.lg }}
       >
         {/* Rule: a Card holds content, never other Cards. FeedCard is
             already a Card (border, hairline, lift shadow), so a section

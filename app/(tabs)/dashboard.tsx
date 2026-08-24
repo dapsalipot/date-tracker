@@ -164,7 +164,7 @@ export default function Dashboard() {
       */}
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: theme.space.md, paddingBottom: theme.space.xxl, gap: theme.space.md }}
+        contentContainerStyle={{ paddingTop: theme.space.md, paddingBottom: theme.space.xxl, gap: theme.space.lg }}
       >
         <Card>
           <MicroLabel>THIS MONTH</MicroLabel>
@@ -237,7 +237,7 @@ export default function Dashboard() {
             their parent's colour, which shows nothing the bars do not.
           */}
           {!drilledKind && kindSlices.length > 0 && (
-            <View style={{ alignItems: 'center', marginTop: theme.space.md }}>
+            <View style={{ alignItems: 'center', marginTop: theme.space.sm }}>
               <Ring slices={kindSlices} tintOf={kindTint}>
                 <Text
                   numberOfLines={1}

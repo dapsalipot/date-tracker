@@ -489,7 +489,7 @@ export default function Feed() {
           keyExtractor={feedRowKey}
           stickySectionHeadersEnabled={false}
           ListHeaderComponent={listHeader}
-          contentContainerStyle={{ paddingBottom: listBottomInset, gap: theme.space.md }}
+          contentContainerStyle={{ paddingBottom: listBottomInset, gap: theme.space.sm }}
           renderSectionHeader={({ section }) => <MonthHeader section={section} currencyCode={ctx.currencyCode} />}
           renderItem={({ item }) => (
             <FeedRhythmRow row={item} onPress={(date) => router.push(`/date/${date.id}`)} />
@@ -508,7 +508,7 @@ export default function Feed() {
           data={monthRows}
           keyExtractor={feedRowKey}
           ListHeaderComponent={listHeader}
-          contentContainerStyle={{ paddingBottom: listBottomInset, gap: theme.space.md }}
+          contentContainerStyle={{ paddingBottom: listBottomInset, gap: theme.space.sm }}
           renderItem={({ item }) => (
             <FeedRhythmRow row={item} onPress={(date) => router.push(`/date/${date.id}`)} />
           )}
@@ -617,7 +617,7 @@ function FeedRhythmRow({ row, onPress }: { row: FeedRow; onPress: (date: FeedDat
   const [first, second] = row.dates;
   if (first === undefined) return null; // buildFeedRows never emits an empty pair
   return (
-    <View style={{ flexDirection: 'row', gap: theme.space.md }}>
+    <View style={{ flexDirection: 'row', gap: theme.space.sm }}>
       <View style={{ flex: 1 }}>
         <FeedCard date={first} onPress={() => onPress(first)} />
       </View>

@@ -72,22 +72,34 @@ export function FeedCard({ date, onPress }: Props) {
       onPress={onPress}
       photoUri={date.coverUri !== null ? photoUri(date.coverUri) : null}
       photoHeight={COVER_HEIGHT}
+      radius={theme.radius.md}
     >
-      <View style={{ padding: theme.space.md }}>
+      <View style={{ padding: theme.space.sm }}>
         {/*
-          V3 fix: at two-up width there isn't room for the title and the
-          amount on one row at title size — the amount (fixed width) was
-          winning the row and collapsing the title to a sliver. The title is
-          how you tell one card from another, so it gets the full-width row;
-          the amount moves down onto the meta line, same placement `FeedHero`
-          already uses for its own title/meta split.
+          V4 fix: `subtitle` (17px) replaces `title` (22px) here — this card
+          is half the screen wide in the two-up grid, and title-size type
+          left no room to also fit the amount without wrapping mid-sentence.
+          The amount gets its own line below the date/stop-count meta line
+          instead of sharing a row with either — at two-up width there isn't
+          reliably enough room next to a realistic title AND a five-figure
+          total, but a line to itself always fits.
         */}
-        <Text style={{ ...theme.type.title, color: t.role.ink }} numberOfLines={1}>
+        <Text style={{ ...theme.type.subtitle, color: t.role.ink }} numberOfLines={1}>
           {date.title ?? 'Untitled date'}
         </Text>
 
-        <Text style={{ ...theme.type.meta, color: t.role.inkMuted, marginTop: theme.space.xs }}>
-          {formatDateLabel(date.occurredOn)} · {stopLabel} · {total}
+        <Text
+          style={{ ...theme.type.meta, color: t.role.inkMuted, marginTop: theme.space.xs }}
+          numberOfLines={1}
+        >
+          {formatDateLabel(date.occurredOn)} · {stopLabel}
+        </Text>
+
+        <Text
+          style={{ ...theme.type.meta, color: t.role.inkMuted, marginTop: theme.space.xs }}
+          numberOfLines={1}
+        >
+          {total}
         </Text>
 
         {/*

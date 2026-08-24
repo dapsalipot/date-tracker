@@ -14,6 +14,10 @@ const family: Record<'regular' | 'semi' | 'bold' | 'extra', RegisteredFont> = {
 const type = {
   display: { fontSize: 34, lineHeight: 38, letterSpacing: 0, fontFamily: family.extra },
   title: { fontSize: 22, lineHeight: 28, letterSpacing: 0, fontFamily: family.extra },
+  // Between title and body: a list card's own title needs presence without
+  // claiming headline size on a card that's half the screen wide. Bold, not
+  // extra — extra stays reserved for the two genuine headline sizes above.
+  subtitle: { fontSize: 17, lineHeight: 22, letterSpacing: 0, fontFamily: family.bold },
   body: { fontSize: 16, lineHeight: 24, letterSpacing: 0, fontFamily: family.regular },
   meta: { fontSize: 13, lineHeight: 18, letterSpacing: 0, fontFamily: family.semi },
   micro: { fontSize: 11, lineHeight: 14, letterSpacing: 1.5, fontFamily: family.bold },
