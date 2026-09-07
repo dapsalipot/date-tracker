@@ -1,21 +1,13 @@
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { currencySymbol, minorExponent } from '@/domain/money/money';
+import { nextAmount } from './amountInput';
 import { Card } from './Card';
 import { tap } from './feedback';
 import { theme } from './theme';
 import { useTheme } from './ThemeProvider';
 
 const ALL_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'] as const;
-
-/**
- * Cap on the integer part's digit count, applied regardless of currency.
- * Nothing stops a runaway string of taps otherwise. PHP dates in the tens of
- * thousands of pesos are normal (a resort weekend, a ring); 7 digits allows
- * up to 9,999,999 — two orders of magnitude above that — while still keeping
- * the amount a bounded, sane number.
- */
-const MAX_INTEGER_DIGITS = 7;
 
 interface Props {
   value: string;
@@ -44,27 +36,11 @@ export function AmountKeypad({ value, onChange, currencyCode, placeholder }: Pro
   const exponent = minorExponent(currencyCode);
   const keys = exponent === 0 ? ALL_KEYS.filter((key) => key !== '.') : ALL_KEYS;
 
+  // The rules themselves live in amountInput.ts, where they are testable
+  // without a renderer — this component is left with feedback and layout.
   const press = (key: string) => {
     tap();
-    if (key === '⌫') return onChange(value.slice(0, -1));
-
-    const [whole, fraction] = value.split('.');
-
-    if (key === '.') {
-      // Zero-exponent currencies (JPY, KRW) have no fractional unit at all —
-      // the key is already filtered out of `keys`, but guard here too in
-      // case press() is ever called from something other than a key render.
-      if (exponent === 0 || fraction !== undefined) return;
-      return onChange(value + key);
-    }
-
-    if (fraction !== undefined) {
-      if (fraction.length >= exponent) return;
-    } else if ((whole ?? '').length >= MAX_INTEGER_DIGITS) {
-      return;
-    }
-
-    onChange(value + key);
+    onChange(nextAmount(value, key, exponent));
   };
 
   const symbol = currencySymbol(currencyCode);
