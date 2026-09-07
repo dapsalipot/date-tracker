@@ -6,7 +6,7 @@ import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { budgetStatusFor } from '@/domain/budget/status';
 import { listStopsForDate } from '@/domain/stops/edit';
 import { captureStop, listFeedDates } from '@/domain/dates/repository';
-import { deleteDate, loadDateDetail, publishDate, unpublishDate, updateDateDetails } from './compose';
+import { deleteDate, loadDateDetail, publishDate, updateDateDetails } from './compose';
 
 const DEPS = testDeps(1_785_000_000_000, '2026-08-03');
 
@@ -124,15 +124,6 @@ describe('publishDate', () => {
     expect(loadDateDetail(db, dateId)?.status).toBe('published');
   });
 
-  it('can be reversed', () => {
-    const { db, dateId } = setup();
-    updateDateDetails(db, DEPS, dateId, { title: 'Tagaytay' });
-    publishDate(db, DEPS, dateId);
-
-    unpublishDate(db, DEPS, dateId);
-
-    expect(loadDateDetail(db, dateId)?.status).toBe('draft');
-  });
 });
 
 describe('deleteDate', () => {

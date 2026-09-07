@@ -92,13 +92,6 @@ export function publishDate(db: AppDatabase, deps: Deps, dateId: string): void {
     .run();
 }
 
-export function unpublishDate(db: AppDatabase, deps: Deps, dateId: string): void {
-  db.update(dates)
-    .set({ status: 'draft', updatedAt: deps.clock.nowMs() })
-    .where(eq(dates.id, dateId))
-    .run();
-}
-
 /**
  * Removes a date and everything filed under it.
  *

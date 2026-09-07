@@ -64,6 +64,12 @@ export function photosForDateQuery(db: AppDatabase, dateId: string) {
     .orderBy(asc(photos.takenAt));
 }
 
+/**
+ * The screens all subscribe to `photosForDateQuery` instead, so a search for
+ * callers finds only tests and this looks like dead code. It is not: it is how
+ * `attachPhoto` and `detachPhoto` — both live — are asserted, and deleting it
+ * deletes their coverage. Left deliberately.
+ */
 export function listPhotosForDate(db: AppDatabase, dateId: string): PhotoRow[] {
   return photosForDateQuery(db, dateId).all();
 }

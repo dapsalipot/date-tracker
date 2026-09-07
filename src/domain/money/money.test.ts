@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addMoney,
   minorToMajorString,
   formatMoney,
   money,
   parseMajorToMinor,
-  sumMoney,
-  zeroMoney,
 } from './money';
 
 describe('parseMajorToMinor', () => {
@@ -38,11 +35,14 @@ describe('parseMajorToMinor', () => {
     expect(() => parseMajorToMinor('abc', 'PHP')).toThrow(/invalid/i);
   });
 
-  it('sums exactly in minor units', () => {
+  it('parses to exact minor units, with no float drift', () => {
+    // 0.10 + 0.20 is the classic float trap: it yields 0.30000000000000004.
+    // Parsing to integer minor units is what makes the sum exact, so the
+    // assertion is on the integers themselves rather than on a helper.
     const a = parseMajorToMinor('0.10', 'PHP');
     const b = parseMajorToMinor('0.20', 'PHP');
-    expect(addMoney(a, b).amountMinor).toBe(30);
-    expect(formatMoney(addMoney(a, b))).toBe('₱0.30');
+    expect(a.amountMinor + b.amountMinor).toBe(30);
+    expect(formatMoney(money(a.amountMinor + b.amountMinor, 'PHP'))).toBe('₱0.30');
   });
 
   it('rejects trailing garbage that parseFloat would silently accept', () => {
@@ -59,27 +59,6 @@ describe('parseMajorToMinor', () => {
 
   it('rejects a bare decimal point', () => {
     expect(() => parseMajorToMinor('.', 'PHP')).toThrow(/invalid/i);
-  });
-});
-
-describe('addMoney', () => {
-  it('adds same-currency amounts', () => {
-    expect(addMoney(money(100, 'PHP'), money(250, 'PHP')).amountMinor).toBe(350);
-  });
-
-  it('throws on currency mismatch', () => {
-    expect(() => addMoney(money(100, 'PHP'), money(100, 'USD'))).toThrow(/currency/i);
-  });
-});
-
-describe('sumMoney', () => {
-  it('returns zero for an empty list', () => {
-    expect(sumMoney([], 'PHP')).toEqual(zeroMoney('PHP'));
-  });
-
-  it('sums a list', () => {
-    const items = [money(42000, 'PHP'), money(124000, 'PHP'), money(68000, 'PHP')];
-    expect(sumMoney(items, 'PHP').amountMinor).toBe(234000);
   });
 });
 

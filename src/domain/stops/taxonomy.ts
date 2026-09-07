@@ -15,7 +15,3 @@ export const SUBKINDS: Readonly<Record<StopKind, readonly string[]>> = {
   gift: ['flowers', 'jewelry', 'surprise'],
   other: [],
 };
-
-export function isValidSubkind(kind: StopKind, subkind: string): boolean {
-  return SUBKINDS[kind].includes(subkind);
-}

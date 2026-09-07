@@ -34,21 +34,6 @@ export function money(amountMinor: number, currencyCode: string): Money {
   return { amountMinor, currencyCode };
 }
 
-export function zeroMoney(currencyCode: string): Money {
-  return { amountMinor: 0, currencyCode };
-}
-
-export function addMoney(a: Money, b: Money): Money {
-  if (a.currencyCode !== b.currencyCode) {
-    throw new Error(`currency mismatch: ${a.currencyCode} vs ${b.currencyCode}`);
-  }
-  return money(a.amountMinor + b.amountMinor, a.currencyCode);
-}
-
-export function sumMoney(items: readonly Money[], currencyCode: string): Money {
-  return items.reduce<Money>((acc, item) => addMoney(acc, item), zeroMoney(currencyCode));
-}
-
 /**
  * Parses a major-unit string ("2,340.50") into minor units (234050).
  *
