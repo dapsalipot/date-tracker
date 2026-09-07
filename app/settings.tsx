@@ -17,17 +17,18 @@ import { useTheme, useThemeToggle } from '@/ui/ThemeProvider';
 import { tap } from '@/ui/feedback';
 
 /**
- * The two settings that had nowhere to live.
+ * The settings that had nowhere to live.
  *
- * `setBudget` existed, was tested, and had exactly one caller — the seed
- * fixture. Every budget figure the app displayed came from seeded data, so a
- * real user's dashboard bar and capture sheet showed "no budget set" forever.
- * That is what this screen is for; the theme toggle moved here from the
- * Spending header because a colour scheme is a setting, not a chart control.
+ * `setBudget` and `renamePerson` were both written, tested, and called by
+ * nothing but the seed fixture — so every budget figure the app displayed came
+ * from seeded data, and a person's name, typed once into the payer picker, was
+ * permanent. The theme toggle moved here from the Spending header, because a
+ * colour scheme is a setting rather than a chart control.
  *
- * `renamePerson` was in the same position — written, tested, never called.
- * People could only ever be added, from the payer picker, so a name typed
- * wrong stayed wrong in every picker forever.
+ * Section headings sit on the ground and the cards below them hold only
+ * content — the same shape as the feed's month headings. A card never contains
+ * another card, which is why the keypad (a Card in its own right) is not
+ * wrapped in one here.
  */
 export default function Settings() {
   const t = useTheme();
@@ -45,6 +46,8 @@ export default function Settings() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState('');
 
+  // Safe on every string the keypad can produce — nextAmount guarantees a
+  // digit is present, which is what parseMajorToMinor requires.
   const parsedMinor =
     amount === '' ? 0 : parseMajorToMinor(amount, ctx.currencyCode).amountMinor;
 
@@ -66,116 +69,120 @@ export default function Settings() {
     setEditingId(null);
   };
 
+  const sectionNote = { ...theme.type.meta, color: t.role.inkMuted } as const;
+
   return (
     <Screen scroll>
       <View style={{ gap: theme.space.lg, paddingTop: theme.space.md }}>
-        <Card>
+        <View style={{ gap: theme.space.sm }}>
           <MicroLabel>MONTHLY BUDGET</MicroLabel>
-          <Text style={{ ...theme.type.meta, color: t.role.inkMuted, marginTop: theme.space.xs }}>
+          <Text style={sectionNote}>
             {current === null
               ? 'Not set yet. What you set here carries into every later month until you change it.'
               : `Now ${formatMoney(money(current, ctx.currencyCode))}, carried forward each month.`}
           </Text>
-          <View style={{ marginTop: theme.space.md }}>
-            <AmountKeypad
-              value={amount}
-              onChange={setAmount}
-              currencyCode={ctx.currencyCode}
-              placeholder={
-                current === null ? undefined : minorToMajorString(current, ctx.currencyCode)
-              }
-            />
-          </View>
-          <View style={{ marginTop: theme.space.md }}>
-            {/* Zero is a real number the keypad can produce and a meaningless
-                budget — every date would open over budget on capture. */}
-            <Button label="Save budget" onPress={save} disabled={parsedMinor === 0} />
-          </View>
-        </Card>
+          <AmountKeypad
+            value={amount}
+            onChange={setAmount}
+            currencyCode={ctx.currencyCode}
+            placeholder={
+              current === null ? undefined : minorToMajorString(current, ctx.currencyCode)
+            }
+          />
+          {/* Zero is a real number the keypad can produce and a meaningless
+              budget — every date would open over budget on capture. */}
+          <Button label="Save budget" onPress={save} disabled={parsedMinor === 0} />
+        </View>
 
-        <Card>
+        <View style={{ gap: theme.space.sm }}>
           <MicroLabel>PEOPLE</MicroLabel>
-          <Text style={{ ...theme.type.meta, color: t.role.inkMuted, marginTop: theme.space.xs }}>
-            Tap a name to fix it. These are who the payer picker offers.
-          </Text>
-          {people.map((person) => (
-            <View
-              key={person.id}
+          <Text style={sectionNote}>Tap a name to fix it. These are who the payer picker offers.</Text>
+          <Card>
+            {people.map((person, index) => (
+              <View
+                key={person.id}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.space.sm,
+                  paddingVertical: theme.space.xs,
+                  // A rule between rows, never above the first — the card's own
+                  // edge already separates it from the heading.
+                  borderTopWidth: index === 0 ? 0 : 1,
+                  borderTopColor: t.role.line,
+                  marginTop: index === 0 ? 0 : theme.space.sm,
+                  paddingTop: index === 0 ? 0 : theme.space.sm,
+                }}
+              >
+                {person.id === editingId ? (
+                  <>
+                    <TextInput
+                      value={draftName}
+                      onChangeText={setDraftName}
+                      autoFocus
+                      maxLength={40}
+                      returnKeyType="done"
+                      onSubmitEditing={commitRename}
+                      style={{
+                        ...theme.type.body,
+                        color: t.role.ink,
+                        flex: 1,
+                        paddingVertical: theme.space.xs,
+                        borderBottomWidth: 1,
+                        borderBottomColor: t.role.line,
+                      }}
+                    />
+                    <Pressable onPress={() => { tap(); commitRename(); }} hitSlop={8}>
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={22}
+                        color={draftName.trim() === '' ? t.role.line : t.role.primary}
+                      />
+                    </Pressable>
+                  </>
+                ) : (
+                  <Pressable
+                    onPress={() => {
+                      tap();
+                      setDraftName(person.displayName);
+                      setEditingId(person.id);
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: theme.space.sm }}
+                  >
+                    <Text style={{ ...theme.type.body, color: t.role.ink, flex: 1 }}>
+                      {person.displayName}
+                    </Text>
+                    <Ionicons name="pencil-outline" size={16} color={t.role.inkMuted} />
+                  </Pressable>
+                )}
+              </View>
+            ))}
+          </Card>
+        </View>
+
+        <View style={{ gap: theme.space.sm }}>
+          <MicroLabel>APPEARANCE</MicroLabel>
+          <Card>
+            <Pressable
+              onPress={() => { tap(); toggleTheme(); }}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: theme.space.sm,
-                marginTop: theme.space.sm,
+                justifyContent: 'space-between',
                 paddingVertical: theme.space.xs,
               }}
             >
-              {person.id === editingId ? (
-                <>
-                  <TextInput
-                    value={draftName}
-                    onChangeText={setDraftName}
-                    autoFocus
-                    maxLength={40}
-                    returnKeyType="done"
-                    onSubmitEditing={commitRename}
-                    style={{
-                      ...theme.type.body,
-                      color: t.role.ink,
-                      flex: 1,
-                      paddingVertical: theme.space.xs,
-                      borderBottomWidth: 1,
-                      borderBottomColor: t.role.line,
-                    }}
-                  />
-                  <Pressable onPress={() => { tap(); commitRename(); }} hitSlop={8}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={22}
-                      color={draftName.trim() === '' ? t.role.line : t.role.primary}
-                    />
-                  </Pressable>
-                </>
-              ) : (
-                <Pressable
-                  onPress={() => {
-                    tap();
-                    setDraftName(person.displayName);
-                    setEditingId(person.id);
-                  }}
-                  style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: theme.space.sm }}
-                >
-                  <Text style={{ ...theme.type.body, color: t.role.ink, flex: 1 }}>
-                    {person.displayName}
-                  </Text>
-                  <Ionicons name="pencil-outline" size={16} color={t.role.inkMuted} />
-                </Pressable>
-              )}
-            </View>
-          ))}
-        </Card>
-
-        <Card>
-          <MicroLabel>APPEARANCE</MicroLabel>
-          <Pressable
-            onPress={() => { tap(); toggleTheme(); }}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginTop: theme.space.sm,
-              paddingVertical: theme.space.xs,
-            }}
-          >
-            <Text style={{ ...theme.type.body, color: t.role.ink }}>
-              {t.name === 'light' ? 'Light' : 'Dark'}
-            </Text>
-            <Ionicons
-              name={t.name === 'light' ? 'moon-outline' : 'sunny-outline'}
-              size={20}
-              color={t.role.primary}
-            />
-          </Pressable>
-        </Card>
+              <Text style={{ ...theme.type.body, color: t.role.ink }}>
+                {t.name === 'light' ? 'Light' : 'Dark'}
+              </Text>
+              <Ionicons
+                name={t.name === 'light' ? 'moon-outline' : 'sunny-outline'}
+                size={20}
+                color={t.role.primary}
+              />
+            </Pressable>
+          </Card>
+        </View>
       </View>
     </Screen>
   );
