@@ -81,3 +81,46 @@ describe('weekStreak', () => {
     expect(s.longest).toBe(3);
   });
 });
+
+describe('weekStreak across the year boundary', () => {
+  // Verified against an independent calendar: 2026 is a 53-ISO-week year, and
+  // 2027-01-03 belongs to ISO week (2026, 53). An implementation keyed on
+  // `${year}-W${week}` reads that as "2026-53" while its neighbour reads
+  // "2027-01", so adjacency and sort order both break exactly here. Anchoring
+  // on the Monday's own date is what makes New Year an ordinary week.
+  const NEW_YEAR_RUN = [
+    '2026-12-21', // Mon, week of 2026-12-21
+    '2026-12-27', // Sun, same week
+    '2026-12-28', // Mon, week of 2026-12-28
+    '2027-01-03', // Sun, same week — ISO (2026, 53)
+    '2027-01-04', // Mon, week of 2027-01-04
+    '2027-01-11', // Mon, week of 2027-01-11
+  ] as const;
+
+  it('counts a run that crosses New Year as consecutive', () => {
+    expect(weekStreak(NEW_YEAR_RUN, '2027-01-11')).toEqual({
+      current: 4,
+      longest: 4,
+      endedLastWeek: false,
+    });
+  });
+
+  it('splits the Sunday and Monday that straddle New Year into two weeks', () => {
+    // 2027-01-03 is a Sunday and 2027-01-04 the Monday after it. One week
+    // apart, not one week — this is the pair that a Sunday-start week would
+    // silently merge.
+    expect(weekStreak(['2027-01-03', '2027-01-04'], '2027-01-04')).toMatchObject({
+      current: 2,
+      longest: 2,
+    });
+  });
+
+  it('counts December 31 and January 1 as the same week when they share a Monday', () => {
+    // Thu 2026-12-31 and Fri 2027-01-01 both sit in the week of 2026-12-28.
+    // A year-keyed implementation counts two; the calendar says one.
+    expect(weekStreak(['2026-12-31', '2027-01-01'], '2027-01-01')).toMatchObject({
+      current: 1,
+      longest: 1,
+    });
+  });
+});
