@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { Ionicons } from '@expo/vector-icons';
 import { db } from '@/db/client';
 import { getAppDeps, getLocalContext } from '@/session';
 import { publishedDatesQuery } from '@/domain/dates/drafts';
 import { shiftMonth } from '@/domain/analytics/period';
-import { budgetStatusFor } from '@/domain/budget/status';
+import { budgetStatusFor, budgetsQuery } from '@/domain/budget/status';
 import { spendByKind, spendBySubkind } from '@/domain/analytics/spend';
 import { monthlyTrend, perDateAverage } from '@/domain/analytics/trend';
 import { topPlaces } from '@/domain/analytics/places';
@@ -18,7 +19,7 @@ import { MicroLabel } from '@/ui/MicroLabel';
 import { Ring } from '@/ui/Ring';
 import { Screen } from '@/ui/Screen';
 import { theme } from '@/ui/theme';
-import { useTheme, useThemeToggle } from '@/ui/ThemeProvider';
+import { useTheme } from '@/ui/ThemeProvider';
 
 const TREND_MONTHS = 12;
 const TREND_CHART_HEIGHT = 80;
@@ -26,13 +27,13 @@ const TREND_CHART_HEIGHT = 80;
 const TREND_MIN_SLIVER = 3;
 const TOP_PLACES_LIMIT = 5;
 /**
- * Reserves room at the row's right edge for the theme toggle, which sits in
+ * Reserves room at the row's right edge for the settings button, which sits in
  * its own absolutely-positioned corner rather than as a fourth flex item —
  * see the month stepper below. Without this the `›` step control and the
- * toggle icon would land on top of each other, both flush against the same
+ * gear icon would land on top of each other, both flush against the same
  * right inset.
  */
-const THEME_TOGGLE_GUTTER = 28;
+const SETTINGS_GUTTER = 28;
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -49,7 +50,6 @@ function formatPeriodMonth(periodMonth: string): string {
 
 export default function Dashboard() {
   const t = useTheme();
-  const toggleTheme = useThemeToggle();
   // Theme-dependent, so it can't live at module scope — a useTheme() call
   // there would run before any ThemeProvider exists. `muted` and `kindTint`
   // both moved inside the component for the same reason.
@@ -74,6 +74,9 @@ export default function Dashboard() {
   // Plain reads, not live queries — subscribing to the published-dates table
   // is what makes a capture made while this screen is mounted show up.
   const { data: publishedRows } = useLiveQuery(publishedDatesQuery(db, ctx), [ctx]);
+  // Settings writes a budget without touching a date, so the line above
+  // cannot see it. Subscribed for the invalidation, not for the rows.
+  const { data: budgetRows } = useLiveQuery(budgetsQuery(db, ctx), [ctx]);
 
   const vm = useMemo(() => {
     const todayLocal = deps.clock.todayLocal();
@@ -85,7 +88,7 @@ export default function Dashboard() {
       average: perDateAverage(db, ctx, periodMonth, TREND_MONTHS),
       places: topPlaces(db, ctx, periodMonth, TOP_PLACES_LIMIT, TREND_MONTHS),
     };
-  }, [periodMonth, drilledKind, ctx, deps, publishedRows]);
+  }, [periodMonth, drilledKind, ctx, deps, publishedRows, budgetRows]);
 
   const { budget, kindSlices, subkindSlices, trend, average, places } = vm;
   const budgetMinor = budget.budgetMinor;
@@ -116,7 +119,7 @@ export default function Dashboard() {
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              paddingRight: THEME_TOGGLE_GUTTER,
+              paddingRight: SETTINGS_GUTTER,
             }}
           >
             <Pressable onPress={() => step(-1)} hitSlop={12}>
@@ -142,7 +145,7 @@ export default function Dashboard() {
             month label off centre instead of keeping `‹ Month ›` centred.
           */}
           <Pressable
-            onPress={toggleTheme}
+            onPress={() => router.push('/settings')}
             hitSlop={12}
             style={{
               position: 'absolute',
@@ -152,7 +155,7 @@ export default function Dashboard() {
               justifyContent: 'center',
             }}
           >
-            <Ionicons name={t.name === 'light' ? 'moon-outline' : 'sunny-outline'} size={20} color={t.role.ink} />
+            <Ionicons name="settings-outline" size={20} color={t.role.ink} />
           </Pressable>
         </View>
       </View>

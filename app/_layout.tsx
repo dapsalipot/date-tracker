@@ -84,6 +84,7 @@ function AppGate() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="capture" options={{ presentation: 'modal', headerShown: false }} />
+      <Stack.Screen name="settings" options={{ title: 'Settings' }} />
       <Stack.Screen name="date/[id]/index" options={{ title: 'Date' }} />
       <Stack.Screen name="date/[id]/compose" options={{ title: 'Compose' }} />
       <Stack.Screen name="date/[id]/share" options={{ title: 'Share' }} />

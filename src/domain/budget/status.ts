@@ -46,6 +46,17 @@ export function setBudget(
 }
 
 /**
+ * Subscription target for `useLiveQuery`, not a read — nothing consumes the
+ * rows. The dashboard's other numbers all move when a date changes, so they
+ * ride the published-dates subscription; a budget is written from Settings
+ * with no date involved, and without this the bar kept saying "no budget set"
+ * until the next capture happened to re-run the memo.
+ */
+export function budgetsQuery(db: AppDatabase, scope: CoupleScope) {
+  return db.select().from(budgets).where(eq(budgets.coupleId, scope.coupleId));
+}
+
+/**
  * Budget status for an arbitrary month. `todayLocal` is still needed because
  * `daysLeft` is only meaningful for the month containing today; for any other
  * month `daysRemainingIn` correctly returns 0.
