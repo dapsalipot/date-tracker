@@ -3,7 +3,7 @@ import { createTestDb, testDeps } from '@/test/testDb';
 import { eq } from 'drizzle-orm';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
 import { captureStop } from '@/domain/dates/repository';
-import { couples, dates, stops } from '@/db/schema';
+import { budgets, couples, dates, stops } from '@/db/schema';
 import { budgetStatusFor, computeBudgetStatus, setBudget } from './status';
 
 const AUG_30 = testDeps(1_787_000_000_000, '2026-08-30', 'aug30');
@@ -179,5 +179,58 @@ describe('computeBudgetStatus', () => {
     });
 
     expect(budgetStatusFor(db, scope, '2026-08', '2026-08-14').spentMinor).toBe(0);
+  });
+});
+
+describe('budget carry-forward', () => {
+  it('carries the last set budget into a month with none of its own', () => {
+    const { db, coupleId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+    setBudget(db, coupleId, '2026-08', 800000, AUG_30);
+
+    // Without this, the dashboard's budget bar and the capture sheet's
+    // "left" line both go blank at midnight on the 1st, and nothing in the
+    // app can bring them back — setBudget has no UI caller.
+    expect(budgetStatusFor(db, scope, '2026-09', '2026-09-01').budgetMinor).toBe(800000);
+  });
+
+  it('prefers a budget set for the month itself over an earlier one', () => {
+    const { db, coupleId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+    setBudget(db, coupleId, '2026-08', 800000, AUG_30);
+    setBudget(db, coupleId, '2026-09', 500000, SEP_1);
+
+    expect(budgetStatusFor(db, scope, '2026-09', '2026-09-01').budgetMinor).toBe(500000);
+  });
+
+  it('does not carry a budget backwards into an earlier month', () => {
+    const { db, coupleId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+    setBudget(db, coupleId, '2026-08', 800000, AUG_30);
+
+    // Stepping back through months on the dashboard must not invent a budget
+    // for a month the couple was not budgeting in.
+    expect(budgetStatusFor(db, scope, '2026-07', '2026-08-30').budgetMinor).toBeNull();
+  });
+
+  it('never carries a tombstoned budget', () => {
+    const { db, coupleId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+    setBudget(db, coupleId, '2026-08', 800000, AUG_30);
+    db.update(budgets).set({ deletedAt: 1 }).where(eq(budgets.coupleId, coupleId)).run();
+
+    expect(budgetStatusFor(db, scope, '2026-09', '2026-09-01').budgetMinor).toBeNull();
+  });
+
+  it("never carries another couple's budget", () => {
+    const { db, coupleId } = setup();
+    const scope = { coupleId, currencyCode: 'PHP' };
+    const otherCouple = 'couple-other';
+    db.insert(couples)
+      .values({ id: otherCouple, currencyCode: 'PHP', timezone: 'Asia/Manila', createdAt: 1, updatedAt: 1 })
+      .run();
+    setBudget(db, otherCouple, '2026-08', 800000, AUG_30);
+
+    expect(budgetStatusFor(db, scope, '2026-09', '2026-09-01').budgetMinor).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, lte, sql } from 'drizzle-orm';
 import { budgets, dates, stops } from '@/db/schema';
 import type { AppDatabase } from '@/db/types';
 import type { Deps } from '@/domain/deps';
@@ -72,16 +72,28 @@ export function budgetStatusFor(
 
   const spentMinor = Number(spentRows[0]?.total ?? 0);
 
+  // Carry-forward: the newest budget set in this month or any earlier one.
+  // `lte` + newest-first + limit 1 means an explicit row for `periodMonth`
+  // still wins (it sorts first), while a month with no row of its own
+  // inherits rather than reading null. Without it a budget silently expires
+  // at midnight on the 1st and the dashboard bar disappears — periodMonth is
+  // a per-month row and nothing writes next month's.
+  //
+  // Deliberately one-directional. `lte`, not a nearest-match: stepping back
+  // through months must not invent a budget for a month before the couple
+  // started budgeting.
   const budgetRows = db
     .select()
     .from(budgets)
     .where(
       and(
         eq(budgets.coupleId, scope.coupleId),
-        eq(budgets.periodMonth, periodMonth),
+        lte(budgets.periodMonth, periodMonth),
         isNull(budgets.deletedAt),
       ),
     )
+    .orderBy(desc(budgets.periodMonth))
+    .limit(1)
     .all();
 
   const budgetMinor = budgetRows[0]?.amountMinor ?? null;
