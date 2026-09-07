@@ -1,5 +1,5 @@
 import { and, eq, isNull } from 'drizzle-orm';
-import { dates } from '@/db/schema';
+import { dates, stops } from '@/db/schema';
 import type { AppDatabase } from '@/db/types';
 import type { Deps } from '@/domain/deps';
 
@@ -97,4 +97,30 @@ export function unpublishDate(db: AppDatabase, deps: Deps, dateId: string): void
     .set({ status: 'draft', updatedAt: deps.clock.nowMs() })
     .where(eq(dates.id, dateId))
     .run();
+}
+
+/**
+ * Removes a date and everything filed under it.
+ *
+ * Dates were add-only: the only removal in the app was per-stop, which empties
+ * a date without ever taking it off the wall. A capture made by accident had
+ * no way out.
+ *
+ * The stops are tombstoned in the same transaction, not left behind. Every
+ * analytics read joins `dates` to `stops` and sums the stop rows, so a live
+ * stop under a dead date keeps spending money in the dashboard for an evening
+ * the user has said never happened.
+ */
+export function deleteDate(db: AppDatabase, deps: Deps, dateId: string): void {
+  const now = deps.clock.nowMs();
+
+  db.transaction((tx) => {
+    tx.update(dates).set({ deletedAt: now, updatedAt: now }).where(eq(dates.id, dateId)).run();
+    // `isNull` guard: a stop deleted earlier keeps the timestamp it was
+    // actually deleted at, rather than being back-dated to this gesture.
+    tx.update(stops)
+      .set({ deletedAt: now, updatedAt: now })
+      .where(and(eq(stops.dateId, dateId), isNull(stops.deletedAt)))
+      .run();
+  });
 }

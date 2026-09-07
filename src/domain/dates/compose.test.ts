@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { dates } from '@/db/schema';
 import { createTestDb, testDeps } from '@/test/testDb';
 import { ensureLocalContext } from '@/domain/identity/bootstrap';
-import { captureStop } from '@/domain/dates/repository';
-import { loadDateDetail, publishDate, unpublishDate, updateDateDetails } from './compose';
+import { budgetStatusFor } from '@/domain/budget/status';
+import { listStopsForDate } from '@/domain/stops/edit';
+import { captureStop, listFeedDates } from '@/domain/dates/repository';
+import { deleteDate, loadDateDetail, publishDate, unpublishDate, updateDateDetails } from './compose';
 
 const DEPS = testDeps(1_785_000_000_000, '2026-08-03');
 
@@ -130,5 +132,64 @@ describe('publishDate', () => {
     unpublishDate(db, DEPS, dateId);
 
     expect(loadDateDetail(db, dateId)?.status).toBe('draft');
+  });
+});
+
+describe('deleteDate', () => {
+  function twoDates() {
+    const db = createTestDb();
+    const ctx = ensureLocalContext(db, DEPS);
+    const kept = captureStop(db, DEPS, {
+      coupleId: ctx.coupleId, userId: ctx.userId, kind: 'food', amountMinor: 30000, currencyCode: 'PHP',
+    });
+    updateDateDetails(db, DEPS, kept.dateId, { title: 'Kept' });
+    publishDate(db, DEPS, kept.dateId);
+    const doomed = captureStop(db, testDeps(1_785_100_000_000, '2026-08-04', 'doom'), {
+      coupleId: ctx.coupleId, userId: ctx.userId, kind: 'food', amountMinor: 70000, currencyCode: 'PHP',
+    });
+    updateDateDetails(db, DEPS, doomed.dateId, { title: 'Doomed' });
+    publishDate(db, testDeps(1_785_100_000_000, '2026-08-04', 'doom'), doomed.dateId);
+    return { db, scope: { coupleId: ctx.coupleId, currencyCode: 'PHP' }, kept, doomed };
+  }
+
+  it('takes the date off the feed', () => {
+    // Dates were add-only: a stray capture stayed on the wall forever, and the
+    // only existing removal was per-stop, which leaves an empty date behind.
+    const { db, scope, doomed } = twoDates();
+
+    deleteDate(db, DEPS, doomed.dateId);
+
+    expect(listFeedDates(db, scope).map((d) => d.id)).not.toContain(doomed.dateId);
+  });
+
+  it('leaves every other date alone', () => {
+    const { db, scope, kept, doomed } = twoDates();
+
+    deleteDate(db, DEPS, doomed.dateId);
+
+    expect(listFeedDates(db, scope).map((d) => d.id)).toContain(kept.dateId);
+  });
+
+  it('keeps the deleted date out of the month total', () => {
+    const { db, scope, doomed } = twoDates();
+    expect(budgetStatusFor(db, scope, '2026-08', '2026-08-04').spentMinor).toBe(100000);
+
+    deleteDate(db, DEPS, doomed.dateId);
+
+    expect(budgetStatusFor(db, scope, '2026-08', '2026-08-04').spentMinor).toBe(30000);
+  });
+
+  it('tombstones the stops that belong to it', () => {
+    // Asserted through `listStopsForDate`, not through the month total: every
+    // analytics read joins `dates`, so the date's own tombstone already hides
+    // the spending and an assertion there passes whether or not the stops were
+    // touched. `stopsForDateQuery` selects FROM stops with no join, so it is
+    // the one consumer that can actually see the difference.
+    const { db, doomed } = twoDates();
+    expect(listStopsForDate(db, doomed.dateId)).toHaveLength(1);
+
+    deleteDate(db, DEPS, doomed.dateId);
+
+    expect(listStopsForDate(db, doomed.dateId)).toHaveLength(0);
   });
 });

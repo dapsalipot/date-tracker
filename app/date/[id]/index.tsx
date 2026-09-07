@@ -1,10 +1,11 @@
-import { FlatList, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, FlatList, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { db } from '@/db/client';
-import { dateDetailQuery } from '@/domain/dates/compose';
+import { dateDetailQuery, deleteDate } from '@/domain/dates/compose';
 import { photosForDateQuery } from '@/domain/photos/repository';
 import { reorderStops, stopsForDateQuery } from '@/domain/stops/edit';
 import { formatMoney, money } from '@/domain/money/money';
@@ -29,6 +30,11 @@ export default function DateDetail() {
   const { data: stops } = useLiveQuery(stopsForDateQuery(db, id), [id]);
   const { data: photos } = useLiveQuery(photosForDateQuery(db, id), [id]);
   const detail = detailRows[0] ?? null;
+  // Set before the delete write, for the reason the stop editor documents: the
+  // live query resolves to empty on a microtask while this screen is still
+  // mounted for its exit animation, so without it a deliberate delete is
+  // rewarded with "That date no longer exists."
+  const [leaving, setLeaving] = useState(false);
 
   const move = (index: number, direction: -1 | 1) => {
     const target = index + direction;
@@ -45,11 +51,27 @@ export default function DateDetail() {
     reorderStops(db, getAppDeps(), id, ordered);
   };
 
+  const confirmDelete = () => {
+    Alert.alert('Delete this date?', 'The date and all of its stops go with it.', [
+      { text: 'Keep', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          setLeaving(true);
+          deleteDate(db, getAppDeps(), id);
+          tap();
+          router.back();
+        },
+      },
+    ]);
+  };
+
   // useLiveQuery returns [] on its first render, before the query has ever run,
   // so an empty result is ambiguous between "still loading" and "deleted". Only
   // updatedAt distinguishes them — it stays undefined until the first resolve.
   if (!detail) {
-    if (detailUpdatedAt === undefined) {
+    if (detailUpdatedAt === undefined || leaving) {
       return <SafeAreaView style={{ flex: 1, backgroundColor: t.role.ground }} />;
     }
     return (
@@ -177,20 +199,29 @@ export default function DateDetail() {
         </Card>
       </View>
 
-      <View style={{ flexDirection: 'row', gap: theme.space.sm, margin: theme.space.md }}>
-        <View style={{ flex: 1 }}>
-          <Button variant="quiet" label="Edit" onPress={() => router.push(`/date/${id}/compose`)} />
-        </View>
+      <View style={{ gap: theme.space.sm, margin: theme.space.md }}>
+        <View style={{ flexDirection: 'row', gap: theme.space.sm }}>
+          <View style={{ flex: 1 }}>
+            <Button variant="quiet" label="Edit" onPress={() => router.push(`/date/${id}/compose`)} />
+          </View>
 
         {/*
           A draft has no story yet — offering to post it is offering to post
           "Untitled date". Share only appears once the date is published.
         */}
-        {detail.status === 'published' && (
-          <View style={{ flex: 1 }}>
-            <Button label="Share" onPress={() => router.push(`/date/${id}/share`)} />
-          </View>
-        )}
+          {detail.status === 'published' && (
+            <View style={{ flex: 1 }}>
+              <Button label="Share" onPress={() => router.push(`/date/${id}/share`)} />
+            </View>
+          )}
+        </View>
+
+        {/*
+          Last, quiet, and confirmed. Until this existed the only removal in the
+          app was per-stop, which empties a date without ever taking it off the
+          wall — a capture made by accident had no way out.
+        */}
+        <Button variant="danger" label="Delete date" onPress={confirmDelete} />
       </View>
     </SafeAreaView>
   );
