@@ -94,19 +94,25 @@ function AppGate() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts(FONT_ASSETS);
+  const [fontsLoaded, fontError] = useFonts(FONT_ASSETS);
+  // Settled, not loaded. Holding the splash until the font resolves avoids a
+  // flash of system font reflowing into Nunito, which is more jarring than a
+  // slightly longer splash — but the earlier version of this gate discarded
+  // `useFonts`'s error, so a font that failed to load left `fontsLoaded` false
+  // forever: the splash never hid, nothing ever rendered, and there was no
+  // error anywhere to say why. A page in the system face is bad; an app that
+  // never paints is worse, and it cannot be recovered from by the user.
+  const fontsSettled = fontsLoaded || fontError !== null;
 
   useEffect(() => {
-    // Holding the splash until the font resolves avoids a flash of system font
-    // reflowing into Nunito, which is more jarring than a slightly longer splash.
-    if (fontsLoaded) void SplashScreen.hideAsync();
-  }, [fontsLoaded]);
+    if (fontsSettled) void SplashScreen.hideAsync();
+  }, [fontsSettled]);
 
   // Nothing has mounted yet (still covered by the native splash screen), so
   // this isn't an unthemed branch — it's the same "nothing rendered" moment
   // that existed before first paint anyway. ThemeProvider keeps wrapping the
   // whole tree, migration gate included, once we get past this point.
-  if (!fontsLoaded) return null;
+  if (!fontsSettled) return null;
 
   return (
     <SafeAreaProvider>
