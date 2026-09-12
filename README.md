@@ -41,36 +41,39 @@ config is committed and the command rewrites `package.json`.
 ## Run the app
 
 ```bash
-npx expo start --dev-client
+npm run ios
 ```
 
-### The iOS Simulator does not work on Apple Silicon
+That is `expo run:ios` with three things set, all of which matter on this
+machine:
 
-**Use a physical iPhone.** ML Kit ships fat frameworks rather than
-xcframeworks, so `MLKitVision`, `MLKitCommon`, `GoogleMLKit` and `MLImage` each
-set `EXCLUDED_ARCHS[sdk=iphonesimulator*] = arm64`, which propagates to the app
-target through `Pods-datetracker.debug.xcconfig`. The simulator build therefore
-comes out x86_64-only, and Xcode 26 no longer runs x86_64 simulator apps.
+- `RCT_USE_PREBUILT_RNCORE=0 EXPO_USE_PRECOMPILED_MODULES=0` — build React
+  Native from source. With Expo's prebuilt `React.xcframework`, the app binary
+  never links `PlatformConstants` and every launch dies with
+  `TurboModuleRegistry.getEnforcing(...): 'PlatformConstants' could not be
+  found`. In a Release build there is no red box, so it shows only as a
+  splash screen that never goes away. Confirm with
+  `strings datetracker.app/datetracker | grep -c PlatformConstants` — zero
+  is the fault.
+- `LANG=en_US.UTF-8` — CocoaPods 1.16 on Ruby 4 dies with
+  `Unicode Normalization not appropriate for ASCII-8BIT` without it.
+- `--port 8082` — 8081 is held by another project here, and the dev client
+  remembers whichever Metro it last reached. Pointing it at a wrong Metro
+  produces the same `PlatformConstants` error as the linkage fault above,
+  which cost a full day of misdiagnosis.
 
-The symptom is not obvious. The app launches, then throws:
+The first build compiles all of React Native and takes a while. Later builds
+are incremental. `npm start` starts Metro alone on 8082 for an already-built
+app.
 
-```
-Invariant Violation: TurboModuleRegistry.getEnforcing(...):
-'PlatformConstants' could not be found.
-```
+### The simulator must be iOS 18, not iOS 26
 
-In a Release build there is no red box, so it shows only as a splash screen
-that never goes away. Confirm the cause with:
-
-```bash
-lipo -info ios/build/Build/Products/Debug-iphonesimulator/datetracker.app/datetracker
-```
-
-`architecture: x86_64` on an arm64 Mac is the fault. The exclusion applies only
-to `sdk=iphonesimulator*`, so device builds are arm64 and unaffected — nothing
-is wrong with the app itself. Restoring the simulator would mean dropping the
-OCR pod from simulator builds, which costs nothing to test (a simulator has no
-camera) but has not been done.
+ML Kit ships fat frameworks rather than xcframeworks, so `MLKitVision`,
+`MLKitCommon`, `GoogleMLKit` and `MLImage` each set
+`EXCLUDED_ARCHS[sdk=iphonesimulator*] = arm64`. The simulator build comes out
+x86_64-only, and Xcode 26's iOS 26 runtimes have no x86_64 slice — so pick an
+iOS 18.x device (iPhone 16 Pro works). The exclusion applies only to
+`sdk=iphonesimulator*`; device builds are arm64 and unaffected.
 
 ### If an Xcode build dies in a React Native script phase
 
