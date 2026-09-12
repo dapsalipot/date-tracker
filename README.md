@@ -57,10 +57,13 @@ machine:
   is the fault.
 - `LANG=en_US.UTF-8` — CocoaPods 1.16 on Ruby 4 dies with
   `Unicode Normalization not appropriate for ASCII-8BIT` without it.
-- `--port 8082` — 8081 is held by another project here, and the dev client
-  remembers whichever Metro it last reached. Pointing it at a wrong Metro
-  produces the same `PlatformConstants` error as the linkage fault above,
-  which cost a full day of misdiagnosis.
+- `--port 8082` **and** `RCT_METRO_PORT=8082` — 8081 is held by another
+  project here. `--port` only moves Metro; the port the *app* looks for is a
+  compile-time define (`React-Core.debug.xcconfig` carries
+  `RCT_METRO_PORT=${RCT_METRO_PORT}`), and if it is unset at build time the
+  binary falls back to 8081 and launches with `No script URL provided`.
+  Confirm with `strings datetracker.debug.dylib | grep -A1 RCT_METRO_PORT`.
+  Changing it means a rebuild, not just a Metro restart.
 
 The first build compiles all of React Native and takes a while. Later builds
 are incremental. `npm start` starts Metro alone on 8082 for an already-built

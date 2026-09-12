@@ -51,7 +51,7 @@
   "scripts": {
     "start": "expo start --dev-client --port 8082",
     "android": "expo run:android",
-    "ios": "RCT_USE_PREBUILT_RNCORE=0 EXPO_USE_PRECOMPILED_MODULES=0 LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 expo run:ios --port 8082",
+    "ios": "RCT_METRO_PORT=8082 RCT_USE_PREBUILT_RNCORE=0 EXPO_USE_PRECOMPILED_MODULES=0 LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 expo run:ios --port 8082",
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "vitest run",
